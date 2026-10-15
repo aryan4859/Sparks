@@ -1,0 +1,191 @@
+@import "tailwindcss";
+
+/* `dark:` utilities follow the resolved theme on <html data-theme>, not the OS directly */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-card: var(--card);
+  --color-field: var(--field);
+  --color-surface: var(--surface);
+  --color-spark: var(--spark);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-warn: var(--warn);
+  --color-veg: var(--veg);
+  --font-sans: var(--font-geist-sans);
+  --font-serif: var(--font-instrument-serif);
+}
+
+/* Theme tokens. An inline script in the root layout sets data-theme before
+   first paint from the saved choice, falling back to the OS setting. */
+:root {
+  --paper: #f5f5f5;
+  --ink: #111111;
+  --muted: #6b6b6b;
+  --line: #e0e0e0;
+  --card: #ebebeb;
+  --field: #ffffff;
+  --surface: #fafafa;
+  --spark: #6b6b6b;
+  --danger: #b42318;
+  --danger-bg: #fef3f2;
+  --warn: #6b6b6b;
+  --veg: #6b6b6b;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --paper: #111111;
+  --ink: #ededed;
+  --muted: #9a9a9a;
+  --line: #2a2a2a;
+  --card: #1b1b1b;
+  --field: #191919;
+  --surface: #151515;
+  --spark: #9a9a9a;
+  --danger: #f97066;
+  --danger-bg: #2a1512;
+  --warn: #9a9a9a;
+  --veg: #9a9a9a;
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Always reserve the scrollbar's space: the intro locks scrolling, and without
+     this the page (and the nav logo it lands on) shifts when the scrollbar returns. */
+  scrollbar-gutter: stable;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Uppercase micro-label used for categories and metadata */
+.label {
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+/* ─── Intro preloader ──────────────────────────────────────────────────
+   An inline script adds .intro-running to <html> on the first visit of a
+   session, so returning visitors never see a flash of the overlay. */
+.preloader {
+  display: none;
+}
+.intro-running .preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Failsafe: never trap the page if the script fails */
+  animation: intro-failsafe 0s 10s forwards;
+}
+.intro-running body {
+  overflow: hidden;
+}
+/* Paint the reserved scrollbar gutter to match the intro's background */
+html.intro-running {
+  background: #0a0a0a;
+}
+.intro-running #site-logo {
+  opacity: 0;
+  animation: intro-logo-failsafe 0s 10s forwards;
+}
+.preloader [data-bg] {
+  background: #0a0a0a;
+}
+/* Hidden until the runner has prepared the strokes (the pen's body.ready) */
+.intro-stage {
+  opacity: 0;
+}
+.preloader[data-ready] .intro-stage {
+  opacity: 1;
+}
+.intro-final {
+  color: #f2f2f2;
+  transform-origin: 0 0;
+}
+.intro-final [data-word] text {
+  transform-box: fill-box;
+}
+@keyframes intro-failsafe {
+  to {
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+@keyframes intro-logo-failsafe {
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-running .preloader {
+    display: none;
+  }
+  .intro-running #site-logo {
+    opacity: 1;
+  }
+}
+
+/* Leaflet: quiet the default chrome so it matches the site */
+.leaflet-container {
+  font-family: inherit;
+  background: var(--card);
+}
+.leaflet-container img.leaflet-tile {
+  filter: grayscale(1) contrast(0.9) brightness(1.04);
+}
+/* Dark map: invert the greyscale tiles */
+[data-theme="dark"] .leaflet-container img.leaflet-tile {
+  filter: grayscale(1) invert(1) contrast(0.85) brightness(0.9);
+}
+.leaflet-control-attribution {
+  font-size: 10px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--paper) 85%, transparent) !important;
+}
+.leaflet-control-attribution a {
+  color: var(--ink) !important;
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.12);
+}
+/* !important: leaflet.css is loaded later (with the map) and would win a tie */
+.leaflet-bar a,
+.leaflet-bar a:hover {
+  background-color: var(--paper) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+.leaflet-popup-content {
+  margin: 12px 14px;
+}
+
+.map-pin {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--ink);
+  border: 2px solid var(--paper);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+}
