@@ -4,6 +4,7 @@ export const site = {
   name: "Sparks",
   tagline: "A curated guide to Nepal's cafés, kitchens and shops",
   instagram: "https://instagram.com/",
+  email: "sparksby.shabnam@gmail.com",
 };
 
 export const categories: Record<Category, { label: string; plural: string; href: string }> = {

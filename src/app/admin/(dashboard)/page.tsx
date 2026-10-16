@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { placeFromRow, type PlaceRow, type PostRow } from "@/lib/db";
+import { newsletterReady } from "@/lib/newsletter";
 import { categories, formatDate } from "@/lib/site";
 import { dbError } from "@/lib/supabase/errors";
 import { sessionClient } from "@/lib/supabase/server";
@@ -20,7 +21,10 @@ function adminHref(current: Record<string, string>, patch: Record<string, string
 
 export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
   const sp = await searchParams;
-  return one(sp.tab) === "journal" ? <JournalList /> : <PlacesList sp={sp} />;
+  const tab = one(sp.tab);
+  if (tab === "journal") return <JournalList />;
+  if (tab === "subscribers") return <SubscriberList />;
+  return <PlacesList sp={sp} />;
 }
 
 async function PlacesList({ sp }: { sp: SP }) {
@@ -208,6 +212,48 @@ async function JournalList() {
                   <p className="text-xs text-muted">{formatDate(p.date)}</p>
                 </div>
               </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+async function SubscriberList() {
+  const supabase = await sessionClient();
+  const [res, active] = await Promise.all([
+    supabase
+      .from("subscribers")
+      .select("email, created_at, unsubscribed_at")
+      .order("created_at", { ascending: false })
+      .limit(500)
+      .returns<{ email: string; created_at: string; unsubscribed_at: string | null }[]>(),
+    supabase.from("subscribers").select("email", { count: "exact", head: true }).is("unsubscribed_at", null),
+  ]);
+  if (res.error) throw dbError(res.error);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight">Subscribers</h1>
+        <p className="mt-1 text-sm text-muted">
+          {(active.count ?? 0).toLocaleString()} subscribed · each new story is emailed to them when you publish it
+          {!newsletterReady && " (not set up yet: add the GMAIL_* settings, NEWSLETTER_FROM and NEXT_PUBLIC_SITE_URL)"}
+        </p>
+      </div>
+      {res.data.length === 0 ? (
+        <p className="border border-dashed border-line p-6 text-sm text-muted">
+          No subscribers yet. Visitors sign up with the form in the site footer.
+        </p>
+      ) : (
+        <ul className="divide-y divide-line border-y border-line">
+          {res.data.map((s) => (
+            <li key={s.email} className="flex items-center justify-between gap-4 py-3 text-sm">
+              <span className={`truncate ${s.unsubscribed_at ? "text-muted line-through" : ""}`}>{s.email}</span>
+              <span className="shrink-0 text-xs text-muted">
+                {s.unsubscribed_at ? `Left ${formatDate(s.unsubscribed_at)}` : `Joined ${formatDate(s.created_at)}`}
+              </span>
             </li>
           ))}
         </ul>

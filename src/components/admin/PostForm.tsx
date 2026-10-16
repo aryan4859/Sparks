@@ -20,14 +20,19 @@ export function PostForm({
   initial,
   isNew,
   places,
+  newsletter,
 }: {
   initial: Post;
   isNew: boolean;
   places: { slug: string; name: string }[];
+  /** Whether emailing is set up, how many would get it, and whether this story already went out. */
+  newsletter: { ready: boolean; subscribers: number; emailedAt: string | null };
 }) {
   const [post, setPost] = useState(initial);
   const [slugTouched, setSlugTouched] = useState(!isNew);
   const [uploading, setUploading] = useState(false);
+  // Default on for stories that haven't been published yet; opt-in for older ones.
+  const [notify, setNotify] = useState(initial.published === false || isNew);
   const [state, action] = useActionState(savePost, undefined);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -108,6 +113,12 @@ export function PostForm({
                 Published
               </label>
             </div>
+            <NewsletterOption
+              newsletter={newsletter}
+              published={post.published !== false}
+              checked={notify}
+              onChange={setNotify}
+            />
           </div>
           <Field label="Cover photo">
             <ImageUpload value={post.cover} onChange={(url) => set("cover", url)} folder={`posts/${post.slug || "new"}`} aspect="aspect-[3/2]" />
@@ -168,5 +179,40 @@ export function PostForm({
         )}
       </div>
     </form>
+  );
+}
+
+function NewsletterOption({
+  newsletter,
+  published,
+  checked,
+  onChange,
+}: {
+  newsletter: { ready: boolean; subscribers: number; emailedAt: string | null };
+  published: boolean;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  if (newsletter.emailedAt) {
+    return (
+      <p className="text-xs text-muted">
+        Emailed to subscribers on {new Date(newsletter.emailedAt).toLocaleDateString("en-GB", { dateStyle: "long" })}.
+      </p>
+    );
+  }
+  if (!newsletter.ready) {
+    return (
+      <p className="text-xs text-muted">
+        Emailing subscribers is off: set the GMAIL_* settings, NEWSLETTER_FROM and NEXT_PUBLIC_SITE_URL in .env (see PROJECT_STATUS.md).
+      </p>
+    );
+  }
+  const n = newsletter.subscribers.toLocaleString();
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <input name="notify" type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      Email to {n} subscriber{newsletter.subscribers === 1 ? "" : "s"}
+      <span className="text-xs text-muted">{published ? "when saved" : "once published"}</span>
+    </label>
   );
 }

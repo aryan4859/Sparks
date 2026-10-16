@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { categories, site } from "@/lib/site";
+import { NewsletterForm } from "./NewsletterForm";
 
 export function Footer() {
   return (
@@ -9,16 +10,8 @@ export function Footer() {
           <p className="text-2xl font-semibold tracking-tight">
             Keep up with the <span className="font-serif text-3xl font-normal italic">latest spots</span>
           </p>
-          <p className="mt-3 text-sm text-muted">One short email a fortnight. New openings, quiet corners, no spam.</p>
-          <form className="mt-5 flex border-b border-ink">
-            <input
-              type="email"
-              required
-              placeholder="Email address"
-              className="w-full bg-transparent py-2 text-sm outline-none placeholder:text-muted"
-            />
-            <button className="label shrink-0 py-2">Subscribe →</button>
-          </form>
+          <p className="mt-3 text-sm text-muted">An email whenever a new story goes up. New openings, quiet corners, no spam.</p>
+          <NewsletterForm />
         </div>
         <div>
           <p className="label text-muted">Explore</p>
@@ -40,7 +33,11 @@ export function Footer() {
         </div>
       </div>
       <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-2 px-4 pb-8 text-xs text-muted sm:px-6">
-        <span>© {new Date().getFullYear()} {site.name}</span>
+        <span>
+          © {new Date().getFullYear()} {site.name} ·{" "}
+          <Link href="/privacy" className="hover:text-ink hover:underline">Privacy</Link> ·{" "}
+          <Link href="/terms" className="hover:text-ink hover:underline">Terms</Link>
+        </span>
         <span>
           Place data ©{" "}
           <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline hover:text-ink">

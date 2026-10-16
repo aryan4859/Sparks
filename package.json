@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "create-admin": "node --env-file=.env scripts/create-admin.mjs",
-    "import-osm": "node --env-file=.env scripts/import-osm.mjs"
+    "import-osm": "node --env-file=.env scripts/import-osm.mjs",
+    "gmail-auth": "node --env-file=.env scripts/gmail-auth.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { placeToRow, type PostRow } from "@/lib/db";
+import { newsletterReady, sendNewPost } from "@/lib/newsletter";
 import { currentAdmin, sessionClient } from "@/lib/supabase/server";
 import type { Place } from "@/lib/types";
 
@@ -140,6 +142,28 @@ export async function savePost(_: FormState, formData: FormData): Promise<FormSt
     return { error: error.code === "23505" ? "A post with this slug already exists." : error.message };
   }
   refreshSite();
+
+  // Email subscribers once per story. Claiming notified_at first means a double
+  // submit or a later edit can never send it twice.
+  if (row.published && formData.get("notify") === "on" && newsletterReady) {
+    const { data: claimed } = await supabase
+      .from("posts")
+      .update({ notified_at: new Date().toISOString() })
+      .eq("slug", row.slug)
+      .is("notified_at", null)
+      .select("slug")
+      .maybeSingle();
+    if (claimed) {
+      // Send after the response, so saving doesn't wait on hundreds of emails.
+      after(async () => {
+        const { sent, error } = await sendNewPost(supabase, row);
+        if (!error) return console.log(`Newsletter: “${row.title}” sent to ${sent} subscribers`);
+        console.error(`Newsletter: “${row.title}” stopped after ${sent} emails — ${error}`);
+        // Nothing went out, so let the admin try again with the checkbox.
+        if (sent === 0) await supabase.from("posts").update({ notified_at: null }).eq("slug", row.slug);
+      });
+    }
+  }
   redirect("/admin?tab=journal");
 }
 

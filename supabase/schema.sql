@@ -101,6 +101,60 @@ drop policy if exists "Admins can delete posts" on public.posts;
 create policy "Admins can delete posts" on public.posts
   for delete to authenticated using (public.is_admin());
 
+-- When the story was emailed to subscribers (null = not yet). Claimed atomically
+-- before sending, so a story is never emailed twice.
+alter table public.posts add column if not exists notified_at timestamptz;
+
+-- ─── Newsletter subscribers ──────────────────────────────────────────────
+create table if not exists public.subscribers (
+  email           text primary key check (length(email) <= 254 and email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+  token           uuid not null unique default gen_random_uuid(),  -- for unsubscribe links
+  created_at      timestamptz not null default now(),
+  unsubscribed_at timestamptz
+);
+alter table public.subscribers enable row level security;
+
+-- Visitors never touch the table directly: they go through these two functions.
+-- Returns the unsubscribe token for a new or returning subscriber (who then gets a
+-- welcome email), or null if they're already subscribed.
+drop function if exists public.subscribe(text);
+create function public.subscribe(p_email text)
+returns uuid
+language sql
+security definer
+set search_path = ''
+as $$
+  insert into public.subscribers as s (email) values (lower(trim(p_email)))
+  on conflict (email) do update set unsubscribed_at = null
+    where s.unsubscribed_at is not null
+  returning s.token;
+$$;
+
+create or replace function public.unsubscribe(p_token uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.subscribers set unsubscribed_at = now()
+  where token = p_token and unsubscribed_at is null;
+  return found or exists (select 1 from public.subscribers where token = p_token);
+end;
+$$;
+
+revoke execute on function public.subscribe(text) from public;
+revoke execute on function public.unsubscribe(uuid) from public;
+grant execute on function public.subscribe(text) to anon, authenticated;
+grant execute on function public.unsubscribe(uuid) to anon, authenticated;
+
+drop policy if exists "Admins can see subscribers" on public.subscribers;
+create policy "Admins can see subscribers" on public.subscribers
+  for select to authenticated using (public.is_admin());
+drop policy if exists "Admins can delete subscribers" on public.subscribers;
+create policy "Admins can delete subscribers" on public.subscribers
+  for delete to authenticated using (public.is_admin());
+
 -- ─── Photo storage ───────────────────────────────────────────────────────
 insert into storage.buckets (id, name, public)
 values ('media', 'media', true)

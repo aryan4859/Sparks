@@ -181,7 +181,7 @@ Options, best first. **Not decided yet; parked for now.**
 ### Intro & UX
 - [ ] The intro takes about 6.5 s. Consider a "Skip" button or a shorter version
 - [ ] Map pin clustering for when many places are published close together
-- [ ] The newsletter form in the footer doesn't do anything yet
+- [x] Newsletter: the footer form saves subscribers; publishing a story can email it to them (Gmail API, about 500 recipients a day), with one-click unsubscribe. Next: double opt-in (confirm email) to stop people signing up others
 
 ### Code quality
 - [ ] No automated tests. Add a few end-to-end checks (Playwright): home loads, filters work, admin login, intro lands in the nav
@@ -196,7 +196,7 @@ Options, best first. **Not decided yet; parked for now.**
 2. **"Near me"**: sort by distance from the phone's location (the distance code exists for "Nearby")
 3. **More attributes:** wifi, power outlets, laptop-friendly, vegan, gluten-free, parking, pet-friendly, wheelchair access
 4. **Curated lists:** "Best momo in Patan", "Rainy-day cafés", "Date night"
-5. **Newsletter:** connect the footer form to Buttondown, Resend or Brevo (free tiers)
+5. ~~**Newsletter**~~ done (Gmail API). Run `npm run gmail-auth` to set it up
 6. **Share buttons:** WhatsApp, Viber, Instagram story card
 
 ### Bigger features
