@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Newsletter } from "@/components/admin/NewsletterOption";
 import type { PostRow } from "./db";
 import { dbError } from "./supabase/errors";
-import { categories, formatDate, site } from "./site";
+import { categories, formatDate, site, siteUrl } from "./site";
 import type { Place } from "./types";
 
 /**
@@ -12,9 +12,13 @@ import type { Place } from "./types";
  * NEWSLETTER_FROM (e.g. "Sparks <you@gmail.com>", the same account) and NEXT_PUBLIC_SITE_URL.
  * A personal Gmail account can send to about 500 recipients a day.
  */
-const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN } = process.env;
+// GOOGLE_* names are accepted too, since that's what Google Cloud calls them.
+const env = process.env;
+const GMAIL_CLIENT_ID = env.GMAIL_CLIENT_ID || env.GOOGLE_CLIENT_ID;
+const GMAIL_CLIENT_SECRET = env.GMAIL_CLIENT_SECRET || env.GOOGLE_CLIENT_SECRET;
+const GMAIL_REFRESH_TOKEN = env.GMAIL_REFRESH_TOKEN || env.GOOGLE_REFRESH_TOKEN;
 const FROM = process.env.NEWSLETTER_FROM;
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+const SITE_URL = siteUrl;
 
 export const newsletterReady = Boolean(
   GMAIL_CLIENT_ID && GMAIL_CLIENT_SECRET && GMAIL_REFRESH_TOKEN && FROM && process.env.NEXT_PUBLIC_SITE_URL,

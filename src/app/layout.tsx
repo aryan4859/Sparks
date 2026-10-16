@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Instrument_Serif } from "next/font/google";
 import { preloaderDecisionScript } from "@/components/preloader/Preloader";
-import { site } from "@/lib/site";
+import { site, siteUrl } from "@/lib/site";
 import { themeScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -20,6 +20,10 @@ const instrumentSerif = Instrument_Serif({
 export const metadata: Metadata = {
   title: { default: `${site.name} — ${site.tagline}`, template: `%s · ${site.name}` },
   description: "Cafés, restaurants, boutiques and hidden gems across Nepal, handpicked and photographed.",
+  // Makes social-preview image and canonical URLs absolute.
+  metadataBase: new URL(siteUrl),
+  openGraph: { siteName: site.name, locale: "en_NP", type: "website" },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

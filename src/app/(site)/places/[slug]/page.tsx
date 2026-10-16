@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { JsonLd, placeJsonLd } from "@/components/JsonLd";
 import { notFound } from "next/navigation";
 import { PlacesMap } from "@/components/map/PlacesMap";
 import { PlaceCard } from "@/components/PlaceCard";
@@ -14,10 +15,12 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/places/[slug]">): Promise<Metadata> {
   const place = await getPlace((await params).slug);
   if (!place) return {};
+  const title = place.neighborhood ? `${place.name}, ${place.neighborhood}` : place.name;
   return {
-    title: `${place.name}, ${place.neighborhood}`,
-    description: place.tagline,
-    openGraph: { images: [place.cover] },
+    title,
+    description: place.tagline || undefined,
+    alternates: { canonical: `/places/${place.slug}` },
+    openGraph: { title, description: place.tagline || undefined, url: `/places/${place.slug}`, images: place.cover ? [place.cover] : [] },
   };
 }
 
@@ -32,6 +35,7 @@ export default async function PlacePage({ params }: PageProps<"/places/[slug]">)
 
   return (
     <article>
+      <JsonLd data={placeJsonLd(place)} />
       {/* Hero */}
       <div className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14">
         <nav className="label text-muted">

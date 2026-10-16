@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { JsonLd, postJsonLd } from "@/components/JsonLd";
 import { notFound } from "next/navigation";
 import { parsePostBody, readingMinutes } from "@/lib/markdown";
 import { budgetLabel, categories, formatDate } from "@/lib/site";
@@ -15,7 +16,19 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/journal/[slug]">): Promise<Metadata> {
   const post = await getPost((await params).slug);
   if (!post) return {};
-  return { title: post.title, description: post.excerpt, openGraph: { images: [post.cover] } };
+  return {
+    title: post.title,
+    description: post.excerpt || undefined,
+    alternates: { canonical: `/journal/${post.slug}` },
+    openGraph: {
+      type: "article",
+      title: post.title,
+      description: post.excerpt || undefined,
+      url: `/journal/${post.slug}`,
+      publishedTime: post.date,
+      images: post.cover ? [post.cover] : [],
+    },
+  };
 }
 
 export default async function PostPage({ params }: PageProps<"/journal/[slug]">) {
@@ -24,6 +37,7 @@ export default async function PostPage({ params }: PageProps<"/journal/[slug]">)
 
   return (
     <article>
+      <JsonLd data={postJsonLd(post)} />
       <header className="mx-auto max-w-3xl px-4 pt-14 text-center sm:px-6 sm:pt-20">
         <p className="label text-muted">
           {formatDate(post.date)} · {readingMinutes(post.body)} min read

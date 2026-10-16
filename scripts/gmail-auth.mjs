@@ -7,7 +7,8 @@
 //   4. Copy the printed GMAIL_REFRESH_TOKEN line into .env
 import { createServer } from "node:http";
 
-const { GMAIL_CLIENT_ID: clientId, GMAIL_CLIENT_SECRET: clientSecret } = process.env;
+const clientId = process.env.GMAIL_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+const clientSecret = process.env.GMAIL_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
 if (!clientId || !clientSecret) {
   console.error("Set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET in .env first.");
   process.exit(1);
