@@ -80,7 +80,7 @@ const esc = (s: string) =>
 export const unsubscribeUrl = (token: string) => `${SITE_URL}/unsubscribe?token=${token}`;
 
 /** The shared email shell: site name, optional cover photo, content, unsubscribe footer. */
-function layout(inner: string, unsub: string, cover?: { src: string; href: string }) {
+function layout(inner: string, unsub: string, cover?: { src: string; href: string }, footer?: string) {
   return `<!doctype html>
 <html><body style="margin:0;background:#f5f5f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#111">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
@@ -92,8 +92,8 @@ ${inner}
 </td></tr>
 </table>
 <p style="max-width:560px;margin:18px auto 0;font-size:12px;line-height:1.6;color:#888">
-You're getting this because you subscribed at ${esc(SITE_URL.replace(/^https?:\/\//, ""))}.
-<a href="${unsub}" style="color:#888">Unsubscribe</a></p>
+${footer ?? `You're getting this because you subscribed at ${esc(SITE_URL.replace(/^https?:\/\//, ""))}.
+<a href="${unsub}" style="color:#888">Unsubscribe</a>`}</p>
 </td></tr></table>
 </body></html>`;
 }
@@ -168,7 +168,41 @@ async function gmailSend(accessToken: string, to: Subscriber, subject: string, r
   if (!res.ok) throw new Error(`Gmail ${res.status}: ${await res.text()}`);
 }
 
-/** Welcome email for a new subscriber. Never throws; logs failures. */
+export const confirmUrl = (token: string) => `${SITE_URL}/confirm?token=${token}`;
+
+function renderConfirm(confirm: string) {
+  const site_ = esc(SITE_URL.replace(/^https?:\/\//, ""));
+  const html = layout(
+    `<h1 style="margin:0 0 14px;font-size:26px;line-height:1.2;letter-spacing:-0.02em">Confirm your subscription</h1>
+<p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#555">One click and you're on the list for new places and stories from ${esc(site.name)}.</p>
+${button(confirm, "Yes, subscribe me →")}`,
+    confirm,
+    undefined,
+    `Someone (hopefully you) signed up at ${site_} with this address. If it wasn't you, just ignore this email: you won't hear from us again.`,
+  );
+  const text = [
+    "Confirm your subscription",
+    "",
+    `One click and you're on the list for new places and stories from ${site.name}:`,
+    confirm,
+    "",
+    "If you didn't sign up, just ignore this email: you won't hear from us again.",
+  ].join("\n");
+  return { html, text };
+}
+
+/** "Please confirm" email for a new sign-up (double opt-in). Never throws; logs failures. */
+export async function sendConfirmation(to: Subscriber) {
+  if (!newsletterReady) return;
+  try {
+    await gmailSend(await gmailAccessToken(), to, `Confirm your ${site.name} subscription`, () => renderConfirm(confirmUrl(to.token)));
+    console.log(`Newsletter: confirmation email sent to ${to.email}`);
+  } catch (e) {
+    console.error(`Newsletter: confirmation email to ${to.email} failed — ${e instanceof Error ? e.message : e}`);
+  }
+}
+
+/** Welcome email, sent once a subscriber confirms. Never throws; logs failures. */
 export async function sendWelcome(to: Subscriber) {
   if (!newsletterReady) return;
   try {
@@ -187,6 +221,7 @@ async function activeSubscribers(supabase: SupabaseClient) {
       .from("subscribers")
       .select("email, token")
       .is("unsubscribed_at", null)
+      .not("confirmed_at", "is", null) // only addresses whose owner confirmed
       .order("created_at")
       .range(from, from + 999)
       .returns<Subscriber[]>();
@@ -244,7 +279,8 @@ export async function newsletterStatus(supabase: SupabaseClient, row?: NotifyCol
   const { count, error } = await supabase
     .from("subscribers")
     .select("email", { count: "exact", head: true })
-    .is("unsubscribed_at", null);
+    .is("unsubscribed_at", null)
+    .not("confirmed_at", "is", null);
   if (error) throw dbError(error);
   return {
     ready: newsletterReady,

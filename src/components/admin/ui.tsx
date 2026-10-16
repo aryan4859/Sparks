@@ -1,7 +1,7 @@
 "use client";
 
 import { unstable_rethrow } from "next/navigation";
-import { useState, useTransition } from "react";
+import { createContext, useCallback, useContext, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 
 export const inputClass =
@@ -39,15 +39,46 @@ export function Panel({ title, children, action }: { title: string; children: Re
   );
 }
 
+// ─── Uploads in progress ─────────────────────────────────────────────────
+// Forms wrap themselves in <UploadsProvider>; photo uploads report through
+// useUploads().track(), and the submit button waits until they've finished,
+// so a place can't be saved without the photo that's still uploading.
+
+const UploadsContext = createContext<{ busy: number; add: (delta: number) => void } | null>(null);
+
+export function UploadsProvider({ children }: { children: React.ReactNode }) {
+  const [busy, setBusy] = useState(0);
+  const add = useCallback((delta: number) => setBusy((b) => Math.max(0, b + delta)), []);
+  return <UploadsContext value={{ busy, add }}>{children}</UploadsContext>;
+}
+
+export function useUploads() {
+  const ctx = useContext(UploadsContext);
+  const add = ctx?.add;
+  const track = useCallback(
+    async <T,>(work: Promise<T>) => {
+      add?.(1);
+      try {
+        return await work;
+      } finally {
+        add?.(-1);
+      }
+    },
+    [add],
+  );
+  return { busy: (ctx?.busy ?? 0) > 0, track };
+}
+
 export function SubmitButton({ children, pendingText = "Saving…" }: { children: React.ReactNode; pendingText?: string }) {
   const { pending } = useFormStatus();
+  const { busy: uploading } = useUploads();
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || uploading}
       className="bg-ink px-5 py-2.5 text-sm text-paper transition hover:opacity-85 disabled:opacity-50"
     >
-      {pending ? pendingText : children}
+      {pending ? pendingText : uploading ? "Waiting for photo upload…" : children}
     </button>
   );
 }
@@ -67,18 +98,18 @@ export function ErrorNote({ message }: { message?: string }) {
   return <p className="border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">{message}</p>;
 }
 
-export function slugify(s: string) {
-  return s
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 /** Delete with a confirm step, a pending state (no double clicks) and a visible error if it fails. */
-export function DeleteButton({ confirmText, action }: { confirmText: string; action: () => Promise<{ error?: string } | undefined> }) {
+export function DeleteButton({
+  confirmText,
+  action,
+  label = "Delete",
+  pendingLabel = "Deleting…",
+}: {
+  confirmText: string;
+  action: () => Promise<{ error?: string } | undefined>;
+  label?: string;
+  pendingLabel?: string;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string>();
   return (
@@ -101,7 +132,7 @@ export function DeleteButton({ confirmText, action }: { confirmText: string; act
           });
         }}
       >
-        {pending ? "Deleting…" : "Delete"}
+        {pending ? pendingLabel : label}
       </button>
       {error && <p className="mt-1 max-w-xs text-xs text-danger">{error}</p>}
     </div>

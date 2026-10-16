@@ -4,30 +4,51 @@ import { useActionState, useState } from "react";
 import { deletePlace, savePlace } from "@/app/admin/actions";
 import { budgetHint, budgetLabel } from "@/lib/site";
 import type { Budget, Category, MenuItem, MenuSection, Place } from "@/lib/types";
+import { formatSchedule, parseHours } from "@/lib/hours";
+import { coordsFromMapsLink, slugify } from "@/lib/validate";
 import { ImageUpload } from "./ImageUpload";
 import { type Newsletter, NewsletterOption } from "./NewsletterOption";
-import { DeleteButton, ErrorNote, Field, GhostButton, inputClass, Panel, slugify, SubmitButton } from "./ui";
+import { DeleteButton, ErrorNote, Field, GhostButton, inputClass, Panel, SubmitButton, UploadsProvider } from "./ui";
+import { OFFLINE, withNetworkError } from "@/lib/safe-action";
 
 export type Suggestions = { types: string[]; areas: string[]; ambience: string[] };
 
-/** Pulls coordinates out of a pasted Google Maps URL (…/@27.67,85.32,17z or ?q=27.67,85.32). */
-function coordsFromMapsLink(s: string) {
-  const m = s.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) ?? s.match(/[?&](?:q|query|destination)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/) ?? s.match(/^\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)\s*$/);
-  return m ? { lat: Number(m[1]), lng: Number(m[2]) } : null;
+/** Shows how the hours were understood, so "Open now" works for this place. */
+function hoursHint(hours?: string) {
+  const examples = "e.g. 9:00am - 8:30pm · Mon-Fri 8am-6pm; Sat 9am-2pm; Sun closed · 24/7";
+  if (!hours?.trim()) return examples;
+  const schedule = parseHours(hours);
+  return schedule
+    ? `✓ Understood as: ${formatSchedule(schedule)}`
+    : `Not understood, so “Open now” will leave this place out. Try: ${examples}`;
 }
 
-export function PlaceForm({
+const savePlaceAction = withNetworkError(savePlace, () => ({ error: OFFLINE }));
+
+/** The form, inside an UploadsProvider so saving waits for photo uploads. */
+export function PlaceForm(props: React.ComponentProps<typeof PlaceFormFields>) {
+  return (
+    <UploadsProvider>
+      <PlaceFormFields {...props} />
+    </UploadsProvider>
+  );
+}
+
+function PlaceFormFields({
   initial,
   isNew,
   suggestions,
   returnTo,
   newsletter,
+  fromSuggestion,
 }: {
   initial: Place;
   isNew: boolean;
   suggestions: Suggestions;
   returnTo: string;
   newsletter: Newsletter;
+  /** Set when this new place starts from a visitor's suggestion. */
+  fromSuggestion?: { id: string; mapsLink: string; note: string };
 }) {
   const [place, setPlace] = useState<Place>(initial);
   // Default on for places that haven't been published yet; opt-in for ones already live.
@@ -35,8 +56,8 @@ export function PlaceForm({
   const [slugTouched, setSlugTouched] = useState(!isNew);
   // The URL can change until a place is published; after that, links to it may exist.
   const slugEditable = isNew || initial.published === false;
-  const [mapsLink, setMapsLink] = useState("");
-  const [state, action] = useActionState(savePlace, undefined);
+  const [mapsLink, setMapsLink] = useState(fromSuggestion?.mapsLink ?? "");
+  const [state, action] = useActionState(savePlaceAction, undefined);
 
   const set = <K extends keyof Place>(key: K, value: Place[K]) => setPlace((p) => ({ ...p, [key]: value }));
   const loc = place.location ?? { lat: 0, lng: 0, address: "" };
@@ -48,6 +69,20 @@ export function PlaceForm({
     <form action={action} className="space-y-6">
       <input type="hidden" name="payload" value={JSON.stringify(place)} />
       <input type="hidden" name="isNew" value={isNew ? "1" : "0"} />
+      {fromSuggestion && (
+        <>
+          <input type="hidden" name="suggestionId" value={fromSuggestion.id} />
+          <p className="border border-line bg-paper px-4 py-3 text-sm">
+            <span className="label text-muted">From a visitor&apos;s suggestion</span>
+            {fromSuggestion.note && <span className="mt-1 block whitespace-pre-line">“{fromSuggestion.note}”</span>}
+            {fromSuggestion.mapsLink && !coordsFromMapsLink(fromSuggestion.mapsLink) && (
+              <span className="mt-1 block text-muted">
+                The map link is a short link — open it, then paste the full Google Maps URL below to fill the location.
+              </span>
+            )}
+          </p>
+        </>
+      )}
       <input type="hidden" name="originalSlug" value={initial.slug} />
       <input type="hidden" name="returnTo" value={returnTo} />
 
@@ -244,8 +279,8 @@ export function PlaceForm({
           <Field label="City">
             <input className={inputClass} value={place.city} onChange={(e) => set("city", e.target.value)} />
           </Field>
-          <Field label="Opening hours">
-            <input className={inputClass} value={place.hours ?? ""} placeholder="8:00 – 20:00 daily" onChange={(e) => set("hours", e.target.value)} />
+          <Field label="Opening hours" hint={hoursHint(place.hours)}>
+            <input className={inputClass} value={place.hours ?? ""} placeholder="9:00am - 8:30pm" onChange={(e) => set("hours", e.target.value)} />
           </Field>
           <Field label="Date added">
             <input className={inputClass} type="date" value={place.addedAt} onChange={(e) => set("addedAt", e.target.value)} />

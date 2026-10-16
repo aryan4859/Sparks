@@ -1,10 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { placeFromRow, type PlaceRow, type PostRow } from "@/lib/db";
+import { dismissSuggestion, eraseSubscriber } from "@/app/admin/actions";
+import { DeleteButton } from "@/components/admin/ui";
 import { newsletterReady } from "@/lib/newsletter";
 import { categories, firstParam, formatDate } from "@/lib/site";
 import { dbError } from "@/lib/supabase/errors";
 import { sessionClient } from "@/lib/supabase/server";
+import type { Category } from "@/lib/types";
 
 const PAGE_SIZE = 50;
 
@@ -24,6 +27,7 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
   const tab = one(sp.tab);
   if (tab === "journal") return <JournalList />;
   if (tab === "subscribers") return <SubscriberList />;
+  if (tab === "suggestions") return <SuggestionList />;
   return <PlacesList sp={sp} />;
 }
 
@@ -225,11 +229,15 @@ async function SubscriberList() {
   const [res, active] = await Promise.all([
     supabase
       .from("subscribers")
-      .select("email, created_at, unsubscribed_at")
+      .select("email, created_at, unsubscribed_at, confirmed_at")
       .order("created_at", { ascending: false })
       .limit(500)
-      .returns<{ email: string; created_at: string; unsubscribed_at: string | null }[]>(),
-    supabase.from("subscribers").select("email", { count: "exact", head: true }).is("unsubscribed_at", null),
+      .returns<{ email: string; created_at: string; unsubscribed_at: string | null; confirmed_at: string | null }[]>(),
+    supabase
+      .from("subscribers")
+      .select("email", { count: "exact", head: true })
+      .is("unsubscribed_at", null)
+      .not("confirmed_at", "is", null),
   ]);
   if (res.error) throw dbError(res.error);
   if (active.error) throw dbError(active.error);
@@ -239,7 +247,7 @@ async function SubscriberList() {
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Subscribers</h1>
         <p className="mt-1 text-sm text-muted">
-          {(active.count ?? 0).toLocaleString()} subscribed · each new story is emailed to them when you publish it
+          {(active.count ?? 0).toLocaleString()} confirmed subscribers · new places and stories are emailed to them when you tick “Email to N subscribers”. Unconfirmed sign-ups are removed after 30 days
           {!newsletterReady && " (not set up yet: add the GMAIL_* settings, NEWSLETTER_FROM and NEXT_PUBLIC_SITE_URL)"}
         </p>
       </div>
@@ -252,9 +260,81 @@ async function SubscriberList() {
           {res.data.map((s) => (
             <li key={s.email} className="flex items-center justify-between gap-4 py-3 text-sm">
               <span className={`truncate ${s.unsubscribed_at ? "text-muted line-through" : ""}`}>{s.email}</span>
-              <span className="shrink-0 text-xs text-muted">
-                {s.unsubscribed_at ? `Left ${formatDate(s.unsubscribed_at)}` : `Joined ${formatDate(s.created_at)}`}
+              <span className="flex shrink-0 items-center gap-4 text-xs text-muted">
+                {s.unsubscribed_at
+                  ? `Left ${formatDate(s.unsubscribed_at)}`
+                  : s.confirmed_at
+                    ? `Joined ${formatDate(s.created_at)}`
+                    : `Waiting for confirmation since ${formatDate(s.created_at)}`}
+                <DeleteButton
+                  confirmText={`Permanently erase ${s.email}? Use this when someone asks for their data to be deleted.`}
+                  action={eraseSubscriber.bind(null, s.email)}
+                  label="Erase"
+                  pendingLabel="Erasing…"
+                />
               </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+type Suggestion = { id: string; name: string; category: Category; area: string; maps_link: string; note: string; created_at: string };
+
+async function SuggestionList() {
+  const supabase = await sessionClient();
+  const res = await supabase
+    .from("suggestions")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(200)
+    .returns<Suggestion[]>();
+  if (res.error) throw dbError(res.error);
+
+  // Bare coordinates become a Google Maps search link.
+  const mapHref = (link: string) =>
+    /^https?:/i.test(link) ? link : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(link)}`;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight">Suggestions</h1>
+        <p className="mt-1 text-sm text-muted">
+          Places visitors recommended at <Link href="/suggest" target="_blank" className="underline">/suggest</Link>.
+          “Create draft” opens a new place with the details filled in; the suggestion clears once you save it.
+        </p>
+      </div>
+      {res.data.length === 0 ? (
+        <p className="border border-dashed border-line p-6 text-sm text-muted">No suggestions right now.</p>
+      ) : (
+        <ul className="divide-y divide-line border-y border-line">
+          {res.data.map((s) => (
+            <li key={s.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <p className="font-medium">{s.name}</p>
+                <p className="label text-muted">
+                  {[categories[s.category]?.label, s.area, `Suggested ${formatDate(s.created_at)}`].filter(Boolean).join(" · ")}
+                </p>
+                {s.note && <p className="whitespace-pre-line text-sm">{s.note}</p>}
+                {s.maps_link && (
+                  <a href={mapHref(s.maps_link)} target="_blank" rel="noreferrer" className="inline-block text-sm text-muted underline hover:text-ink">
+                    Open map ↗
+                  </a>
+                )}
+              </div>
+              <div className="flex shrink-0 items-start gap-4">
+                <Link href={`/admin/places/new?suggestion=${s.id}`} className="bg-ink px-4 py-2 text-sm text-paper hover:opacity-85">
+                  Create draft →
+                </Link>
+                <DeleteButton
+                  confirmText={`Dismiss the suggestion “${s.name}”?`}
+                  action={dismissSuggestion.bind(null, s.id)}
+                  label="Dismiss"
+                  pendingLabel="Dismissing…"
+                />
+              </div>
             </li>
           ))}
         </ul>

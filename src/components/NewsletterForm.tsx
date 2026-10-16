@@ -3,11 +3,20 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { subscribe } from "@/app/(site)/actions";
+import { OFFLINE, withNetworkError } from "@/lib/safe-action";
+
+const subscribeAction = withNetworkError(subscribe, (_, fd) => ({ error: OFFLINE, email: String(fd.get("email") ?? "") }));
 
 export function NewsletterForm() {
-  const [state, action, pending] = useActionState(subscribe, undefined);
+  const [state, action, pending] = useActionState(subscribeAction, undefined);
 
-  if (state?.ok) return <p className="mt-5 border-b border-ink py-2 text-sm">Thanks — you&apos;re on the list.</p>;
+  if (state?.ok) {
+    return (
+      <p className="mt-5 border-b border-ink py-2 text-sm">
+        Almost there — check your inbox and tap the link to confirm.
+      </p>
+    );
+  }
 
   return (
     <form action={action} className="mt-5">
@@ -16,6 +25,7 @@ export function NewsletterForm() {
           type="email"
           name="email"
           required
+          defaultValue={state?.email}
           aria-label="Email address"
           placeholder="Email address"
           className="w-full bg-transparent py-2 text-sm outline-none placeholder:text-muted"

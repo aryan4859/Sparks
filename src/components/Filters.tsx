@@ -2,10 +2,11 @@ import Link from "next/link";
 import { budgetHint, budgetLabel } from "@/lib/site";
 import type { PlaceFilters } from "@/lib/queries";
 import type { Budget } from "@/lib/types";
+import { NearMeChip } from "./NearMeChip";
 
 type Facets = { areas: string[]; types: string[]; ambience: string[] };
 
-type Params = Partial<Record<"q" | "area" | "type" | "budget" | "ambience" | "veg" | "category", string>>;
+type Params = Partial<Record<"q" | "area" | "type" | "budget" | "ambience" | "veg" | "category" | "open" | "near", string>>;
 
 function toParams(f: PlaceFilters, includeCategory: boolean): Params {
   return {
@@ -16,6 +17,8 @@ function toParams(f: PlaceFilters, includeCategory: boolean): Params {
     ambience: f.ambience,
     veg: f.veg ? "1" : undefined,
     category: includeCategory ? f.category : undefined,
+    open: f.open ? "1" : undefined,
+    near: f.near ? `${f.near.lat},${f.near.lng}` : undefined,
   };
 }
 
@@ -102,6 +105,17 @@ export function Filters({
         <button className="label shrink-0 pl-3">Search →</button>
       </form>
       <div className="space-y-2.5">
+        <div className="flex items-center gap-3">
+          <span className="label w-20 shrink-0 text-muted">Now</span>
+          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+            <Chip active={!!filters.open} href={toggle("open", "1")} title="Open right now, Nepal time">Open now</Chip>
+            {filters.near ? (
+              <Chip active href={href(base, { ...current, near: undefined })} title="Stop sorting by distance">Near me ✕</Chip>
+            ) : (
+              <NearMeChip baseHref={href(base, current)} />
+            )}
+          </div>
+        </div>
         {rows.map((row) => (
           <div key={row.key} className="flex items-center gap-3">
             <span className="label w-20 shrink-0 text-muted">{row.label}</span>

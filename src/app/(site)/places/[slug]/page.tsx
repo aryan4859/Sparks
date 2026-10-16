@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { JsonLd, placeJsonLd } from "@/components/JsonLd";
+import { OpenStatus } from "@/components/OpenStatus";
+import { ShareButtons } from "@/components/ShareButtons";
 import { notFound } from "next/navigation";
 import { PlacesMap } from "@/components/map/PlacesMap";
 import { PlaceCard } from "@/components/PlaceCard";
-import { budgetHint, budgetLabel, categories, directionsUrl, formatPrice } from "@/lib/site";
+import { budgetHint, budgetLabel, categories, directionsUrl, formatPrice, siteUrl } from "@/lib/site";
 import { getAllPlaceSlugs, getNearby, getPlace } from "@/lib/queries";
 
 export async function generateStaticParams() {
@@ -71,7 +73,11 @@ export default async function PlacePage({ params }: PageProps<"/places/[slug]">)
       <div className="mx-4 mt-6 flex items-center justify-between gap-4 border-y border-line py-3 text-sm lg:hidden">
         <div className="min-w-0">
           <p className="truncate">{place.location?.address ?? "Online only — delivers nationwide"}</p>
-          {place.hours && <p className="truncate text-muted">{place.hours}</p>}
+          {place.hours && (
+            <p className="truncate text-muted">
+              <OpenStatus hours={place.hours} compact />
+            </p>
+          )}
         </div>
         {place.location ? (
           <a
@@ -172,7 +178,11 @@ export default async function PlacePage({ params }: PageProps<"/places/[slug]">)
             {place.vegetarian && (
               <Row label="Diet">{place.vegetarian === "pure-veg" ? "Pure vegetarian" : "Vegetarian-friendly"}</Row>
             )}
-            {place.hours && <Row label="Hours">{place.hours}</Row>}
+            {place.hours && (
+              <Row label="Hours">
+                <OpenStatus hours={place.hours} />
+              </Row>
+            )}
             <Row label="Address">{place.location?.address ?? "Online only — delivers nationwide"}</Row>
           </dl>
           <div className="flex flex-col gap-2">
@@ -196,6 +206,9 @@ export default async function PlacePage({ params }: PageProps<"/places/[slug]">)
                 Instagram ↗
               </a>
             )}
+          </div>
+          <div className="mt-6">
+            <ShareButtons url={`${siteUrl}/places/${place.slug}`} title={place.name} />
           </div>
         </aside>
       </div>

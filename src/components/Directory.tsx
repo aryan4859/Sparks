@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Filters } from "@/components/Filters";
 import { PlacesMap, type MapPin } from "@/components/map/PlacesMap";
 import { PlaceGrid } from "@/components/PlaceCard";
@@ -48,12 +49,18 @@ export async function Directory({
         <section>
           <p className="label mb-6 text-muted">
             {results.length} {results.length === 1 ? "place" : "places"}
+            {filters.open && " open now"}
+            {filters.near && " · nearest first"}
           </p>
           {results.length > 0 ? (
             <PlaceGrid places={results} cols={2} />
           ) : (
             <p className="py-20 text-center text-muted">Nothing matches yet — try removing a filter.</p>
           )}
+          <p className="mt-12 border-t border-line pt-6 text-sm text-muted">
+            Know a place we&apos;re missing?{" "}
+            <Link href="/suggest" className="text-ink underline hover:text-muted">Suggest it →</Link>
+          </p>
         </section>
         <aside className="order-first h-[240px] sm:h-[340px] lg:order-none lg:sticky lg:top-20 lg:h-[calc(100vh-7rem)]">
           <PlacesMap pins={pins} />

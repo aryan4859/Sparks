@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRef, useState } from "react";
 import { browserClient } from "@/lib/supabase/browser";
+import { useUploads } from "./ui";
 
 const MAX_EDGE = 2000;
 
@@ -20,8 +21,18 @@ async function compress(file: File): Promise<Blob> {
   );
 }
 
+const MAX_INPUT_MB = 30;
+
 export async function uploadImage(file: File, folder: string) {
-  const blob = await compress(file);
+  if (!file.type.startsWith("image/")) throw new Error("That file isn't an image.");
+  if (file.size > MAX_INPUT_MB * 1024 * 1024) throw new Error(`That photo is over ${MAX_INPUT_MB} MB — please pick a smaller one.`);
+  let blob: Blob;
+  try {
+    blob = await compress(file);
+  } catch {
+    // Typically iPhone HEIC photos, which most browsers can't decode.
+    throw new Error("This photo format can't be read here (iPhone HEIC?). Export it as JPEG and try again.");
+  }
   const base = file.name.replace(/\.[^.]+$/, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
   const path = `${folder}/${Date.now()}-${base || "photo"}.webp`;
   const supabase = browserClient();
@@ -50,12 +61,14 @@ export function ImageUpload({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
+  const { track } = useUploads();
+
   async function handle(file?: File) {
-    if (!file) return;
+    if (!file || busy) return; // one upload per slot at a time
     setBusy(true);
     setError(undefined);
     try {
-      onChange(await uploadImage(file, folder));
+      onChange(await track(uploadImage(file, folder)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -68,6 +81,7 @@ export function ImageUpload({
     <div>
       <button
         type="button"
+        disabled={busy}
         onClick={() => input.current?.click()}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {

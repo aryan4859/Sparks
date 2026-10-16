@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { JsonLd, postJsonLd } from "@/components/JsonLd";
+import { ShareButtons } from "@/components/ShareButtons";
 import { notFound } from "next/navigation";
 import { parsePostBody, readingMinutes } from "@/lib/markdown";
-import { budgetLabel, categories, formatDate } from "@/lib/site";
+import { budgetLabel, categories, formatDate, siteUrl } from "@/lib/site";
 import { getPlace, getPost, getPosts } from "@/lib/queries";
 import type { PostBlock } from "@/lib/types";
 import { isAllowedImage } from "@/lib/validate";
@@ -55,8 +56,9 @@ export default async function PostPage({ params }: PageProps<"/journal/[slug]">)
           <Block key={i} block={block} />
         ))}
       </div>
-      <div className="mx-auto mt-16 max-w-2xl px-4 sm:px-6">
+      <div className="mx-auto mt-16 flex max-w-2xl flex-wrap items-center justify-between gap-6 border-t border-line px-4 pt-6 sm:px-6">
         <Link href="/journal" className="label text-muted hover:text-ink">← All stories</Link>
+        <ShareButtons url={`${siteUrl}/journal/${post.slug}`} title={post.title} />
       </div>
     </article>
   );

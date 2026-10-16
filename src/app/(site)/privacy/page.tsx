@@ -28,12 +28,25 @@ export default function PrivacyPage() {
 
       <LegalSection title="What we collect">
         <p>
-          <strong>If you subscribe:</strong> your email address, the date you subscribed (and unsubscribed, if you do), and a random
-          code that makes the unsubscribe link in each email work.
+          <strong>If you subscribe:</strong> your email address, the dates you subscribed, confirmed (and unsubscribed, if you
+          do), and a random code that makes the confirm and unsubscribe links work. We email you a link to confirm first; if
+          you don&apos;t confirm, your address is deleted after 30 days and you get nothing else from us.
         </p>
         <p>
           <strong>Settings on your device:</strong> your browser remembers whether you chose the light or dark theme, and whether
           you&apos;ve already seen the intro animation in this visit. These stay on your own device and are never sent to us.
+        </p>
+        <p>
+          <strong>If you suggest a place:</strong> only what you type into the form (the place&apos;s name, area, map link and
+          your note). We don&apos;t ask who you are.
+        </p>
+        <p>
+          <strong>If you tap &ldquo;Near me&rdquo;:</strong> your browser asks your permission, then shares your approximate location
+          (rounded to about 100 metres) with that page request so places can be sorted by distance. It isn&apos;t stored.
+        </p>
+        <p>
+          <strong>Spam protection:</strong> to stop automated abuse of the sign-up and suggestion forms, we briefly count
+          requests per IP address in memory. The IP address isn&apos;t stored.
         </p>
         <p>
           <strong>Server logs:</strong> like any website, our hosting provider may briefly record technical details such as your IP
@@ -43,8 +56,8 @@ export default function PrivacyPage() {
 
       <LegalSection title="How we use it">
         <p>
-          We use your email address only to send you a welcome email when you subscribe, and an email each time we publish a new
-          story in the journal. We don&apos;t combine it with any other information or use it for anything else.
+          We use your email address only to send you the confirmation email, a welcome email once you confirm, and an email
+          when we publish a new place or journal story. We don&apos;t combine it with any other information or use it for anything else.
         </p>
       </LegalSection>
 

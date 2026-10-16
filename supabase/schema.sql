@@ -122,10 +122,24 @@ create table if not exists public.subscribers (
 alter table public.subscribers enable row level security;
 
 -- Visitors never touch the table directly: they go through these two functions.
--- Returns the unsubscribe token for a new or returning subscriber (who then gets a
--- welcome email), or null if they're already subscribed. Past 30 sign-ups in an
--- hour it still subscribes but returns null, so a bot flooding the form can't use
--- up the Gmail sending allowance with welcome emails.
+-- Double opt-in: an address only receives newsletters once its owner clicks the
+-- link in the confirmation email (confirmed_at). Added 16 October 2026; everyone
+-- who signed up before then counts as confirmed.
+do $$
+begin
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'subscribers' and column_name = 'confirmed_at') then
+    alter table public.subscribers add column confirmed_at timestamptz;
+    update public.subscribers set confirmed_at = created_at;
+  end if;
+end;
+$$;
+alter table public.subscribers add column if not exists confirm_sent_at timestamptz;
+
+-- Sign up. Returns the token to put in a confirmation email, or null when no email
+-- should go out: already subscribed, a confirmation was sent less than an hour ago,
+-- or more than 30 were sent site-wide in the last hour (so a bot can't use up the
+-- Gmail allowance). Unconfirmed sign-ups are forgotten after 30 days.
 drop function if exists public.subscribe(text);
 create function public.subscribe(p_email text)
 returns uuid
@@ -136,15 +150,46 @@ as $$
 declare
   t uuid;
 begin
-  insert into public.subscribers as s (email) values (lower(trim(p_email)))
-  on conflict (email) do update set unsubscribed_at = null
-    where s.unsubscribed_at is not null
-  returning s.token into t;
-  if t is not null
-     and (select count(*) from public.subscribers where created_at > now() - interval '1 hour') > 30 then
+  delete from public.subscribers where confirmed_at is null and created_at < now() - interval '30 days';
+
+  if (select count(*) from public.subscribers where confirm_sent_at > now() - interval '1 hour') >= 30 then
     return null;
   end if;
+
+  insert into public.subscribers as s (email, confirm_sent_at) values (lower(trim(p_email)), now())
+  on conflict (email) do update set
+    unsubscribed_at = null,
+    -- Someone who left must confirm again before they're emailed.
+    confirmed_at = case when s.unsubscribed_at is not null then null else s.confirmed_at end,
+    confirm_sent_at = now()
+  where s.unsubscribed_at is not null
+     or (s.confirmed_at is null and (s.confirm_sent_at is null or s.confirm_sent_at < now() - interval '1 hour'))
+  returning s.token into t;
   return t;
+end;
+$$;
+
+-- Confirm from the email link. {"status": "confirmed", "email": …} the first time
+-- (the app then sends the welcome email), "already" after that, "invalid" otherwise.
+create or replace function public.confirm_subscription(p_token uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  e text;
+begin
+  update public.subscribers set confirmed_at = now()
+  where token = p_token and confirmed_at is null and unsubscribed_at is null
+  returning email into e;
+  if e is not null then
+    return jsonb_build_object('status', 'confirmed', 'email', e);
+  end if;
+  if exists (select 1 from public.subscribers where token = p_token and unsubscribed_at is null) then
+    return jsonb_build_object('status', 'already');
+  end if;
+  return jsonb_build_object('status', 'invalid');
 end;
 $$;
 
@@ -165,6 +210,8 @@ revoke execute on function public.subscribe(text) from public;
 revoke execute on function public.unsubscribe(uuid) from public;
 grant execute on function public.subscribe(text) to anon, authenticated;
 grant execute on function public.unsubscribe(uuid) to anon, authenticated;
+revoke execute on function public.confirm_subscription(uuid) from public;
+grant execute on function public.confirm_subscription(uuid) to anon, authenticated;
 
 drop policy if exists "Admins can see subscribers" on public.subscribers;
 create policy "Admins can see subscribers" on public.subscribers
@@ -173,10 +220,55 @@ drop policy if exists "Admins can delete subscribers" on public.subscribers;
 create policy "Admins can delete subscribers" on public.subscribers
   for delete to authenticated using (public.is_admin());
 
+-- ─── Place suggestions from visitors ─────────────────────────────────────
+create table if not exists public.suggestions (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null check (length(name) between 1 and 120),
+  category   text not null check (category in ('cafe', 'restaurant', 'shop')),
+  area       text not null default '' check (length(area) <= 120),
+  maps_link  text not null default '' check (length(maps_link) <= 600),
+  note       text not null default '' check (length(note) <= 1000),
+  created_at timestamptz not null default now()
+);
+alter table public.suggestions enable row level security;
+
+-- Visitors add suggestions only through this function. Past 50 in an hour it
+-- quietly refuses, so a bot can't flood the table.
+create or replace function public.suggest_place(p_name text, p_category text, p_area text, p_maps_link text, p_note text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if (select count(*) from public.suggestions where created_at > now() - interval '1 hour') >= 50 then
+    return false;
+  end if;
+  insert into public.suggestions (name, category, area, maps_link, note)
+  values (trim(p_name), p_category, trim(coalesce(p_area, '')), trim(coalesce(p_maps_link, '')), trim(coalesce(p_note, '')));
+  return true;
+end;
+$$;
+revoke execute on function public.suggest_place(text, text, text, text, text) from public;
+grant execute on function public.suggest_place(text, text, text, text, text) to anon, authenticated;
+
+drop policy if exists "Admins can see suggestions" on public.suggestions;
+create policy "Admins can see suggestions" on public.suggestions
+  for select to authenticated using (public.is_admin());
+drop policy if exists "Admins can delete suggestions" on public.suggestions;
+create policy "Admins can delete suggestions" on public.suggestions
+  for delete to authenticated using (public.is_admin());
+
 -- ─── Photo storage ───────────────────────────────────────────────────────
 insert into storage.buckets (id, name, public)
 values ('media', 'media', true)
 on conflict (id) do nothing;
+-- Uploads are shrunk to WebP in the browser (usually under 1 MB). The bucket
+-- enforces it too: images only, at most 5 MB each.
+update storage.buckets
+set file_size_limit = 5 * 1024 * 1024,
+    allowed_mime_types = array['image/webp', 'image/jpeg', 'image/png', 'image/avif']
+where id = 'media';
 
 drop policy if exists "Admins can upload media" on storage.objects;
 create policy "Admins can upload media" on storage.objects

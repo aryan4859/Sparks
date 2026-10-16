@@ -29,3 +29,20 @@ export function isAllowedImage(src: string) {
     return false;
   }
 }
+
+/** Pulls coordinates out of a pasted Google Maps URL (…/@27.67,85.32,17z or ?q=27.67,85.32). */
+export function coordsFromMapsLink(s: string) {
+  const m = s.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) ?? s.match(/[?&](?:q|query|destination)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/) ?? s.match(/^\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)\s*$/);
+  return m ? { lat: Number(m[1]), lng: Number(m[2]) } : null;
+}
+
+/** URL slug from a name: "Café Nyatapola & Co" → "cafe-nyatapola-and-co". */
+export function slugify(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}

@@ -3,7 +3,8 @@ import type { Budget, Category } from "./types";
 export const site = {
   name: "Sparks",
   tagline: "A curated guide to Nepal's cafés, kitchens and shops",
-  instagram: "https://instagram.com/",
+  /** Your Instagram profile URL; the footer link is hidden while this is empty. */
+  instagram: "",
   email: "sparksby.shabnam@gmail.com",
 };
 
@@ -16,6 +17,10 @@ export const siteUrl = (
   process.env.NEXT_PUBLIC_SITE_URL ||
   (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000")
 ).replace(/\/+$/, "");
+
+if (typeof window === "undefined" && process.env.NODE_ENV === "production" && siteUrl.includes("localhost")) {
+  console.warn("NEXT_PUBLIC_SITE_URL isn't set: email links, the sitemap and share previews will point to localhost.");
+}
 
 export const categories: Record<Category, { label: string; plural: string; href: string }> = {
   cafe: { label: "Café", plural: "Cafés", href: "/cafes" },

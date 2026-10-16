@@ -10,7 +10,7 @@ export function Footer() {
           <p className="text-2xl font-semibold tracking-tight">
             Keep up with the <span className="font-serif text-3xl font-normal italic">latest spots</span>
           </p>
-          <p className="mt-3 text-sm text-muted">An email whenever a new story goes up. New openings, quiet corners, no spam.</p>
+          <p className="mt-3 text-sm text-muted">An email whenever a new place or story goes up. New openings, quiet corners, no spam.</p>
           <NewsletterForm />
         </div>
         <div>
@@ -28,7 +28,10 @@ export function Footer() {
           <p className="label text-muted">{site.name}</p>
           <ul className="mt-4 space-y-2 text-sm">
             <li><Link href="/journal" className="hover:underline">Journal</Link></li>
-            <li><a href={site.instagram} className="hover:underline">Instagram</a></li>
+            <li><Link href="/suggest" className="hover:underline">Suggest a place</Link></li>
+            {site.instagram && (
+              <li><a href={site.instagram} target="_blank" rel="noreferrer" className="hover:underline">Instagram</a></li>
+            )}
           </ul>
         </div>
       </div>

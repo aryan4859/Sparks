@@ -4,9 +4,12 @@ import { useActionState } from "react";
 import { ErrorNote, Field, inputClass, SubmitButton } from "@/components/admin/ui";
 import { site } from "@/lib/site";
 import { signIn } from "../actions";
+import { OFFLINE, withNetworkError } from "@/lib/safe-action";
+
+const signInAction = withNetworkError(signIn, () => ({ error: OFFLINE }));
 
 export default function LoginPage() {
-  const [state, action] = useActionState(signIn, undefined);
+  const [state, action] = useActionState(signInAction, undefined);
   return (
     <div className="flex flex-1 items-center justify-center px-4 py-20">
       <form action={action} className="w-full max-w-sm space-y-5">

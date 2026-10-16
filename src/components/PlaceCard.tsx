@@ -3,7 +3,7 @@ import Link from "next/link";
 import { budgetLabel, categories } from "@/lib/site";
 import type { Place } from "@/lib/types";
 
-export function PlaceCard({ place, priority }: { place: Place; priority?: boolean }) {
+export function PlaceCard({ place, priority }: { place: Place & { km?: number }; priority?: boolean }) {
   return (
     <Link href={`/places/${place.slug}`} className="group block">
       <div className="relative aspect-[4/5] overflow-hidden bg-card">
@@ -22,12 +22,13 @@ export function PlaceCard({ place, priority }: { place: Place; priority?: boolea
       </div>
       <p className="label mt-1 truncate text-muted">
         {categories[place.category].label} · {place.neighborhood}
+        {place.km !== undefined && ` · ${place.km < 1 ? `${Math.round(place.km * 1000)} m` : `${place.km.toFixed(1)} km`}`}
       </p>
     </Link>
   );
 }
 
-export function PlaceGrid({ places, cols = 4 }: { places: Place[]; cols?: 2 | 3 | 4 }) {
+export function PlaceGrid({ places, cols = 4 }: { places: (Place & { km?: number })[]; cols?: 2 | 3 | 4 }) {
   // Two columns even on phones: one tall photo per row makes pages endless to scroll.
   const grid = {
     2: "",

@@ -1,13 +1,26 @@
 "use client";
 
+import { slugify } from "@/lib/validate";
 import { useActionState, useRef, useState } from "react";
 import { deletePost, savePost } from "@/app/admin/actions";
 import type { Post } from "@/lib/types";
 import { ImageUpload, uploadImage } from "./ImageUpload";
 import { type Newsletter, NewsletterOption } from "./NewsletterOption";
-import { DeleteButton, ErrorNote, Field, GhostButton, inputClass, Panel, slugify, SubmitButton } from "./ui";
+import { DeleteButton, ErrorNote, Field, GhostButton, inputClass, Panel, SubmitButton, UploadsProvider, useUploads } from "./ui";
+import { OFFLINE, withNetworkError } from "@/lib/safe-action";
 
-export function PostForm({
+const savePostAction = withNetworkError(savePost, () => ({ error: OFFLINE }));
+
+/** The form, inside an UploadsProvider so saving waits for photo uploads. */
+export function PostForm(props: React.ComponentProps<typeof PostFormFields>) {
+  return (
+    <UploadsProvider>
+      <PostFormFields {...props} />
+    </UploadsProvider>
+  );
+}
+
+function PostFormFields({
   initial,
   isNew,
   places,
@@ -21,9 +34,10 @@ export function PostForm({
   const [post, setPost] = useState(initial);
   const [slugTouched, setSlugTouched] = useState(!isNew);
   const [uploading, setUploading] = useState(false);
+  const { track } = useUploads();
   // Default on for stories that haven't been published yet; opt-in for older ones.
   const [notify, setNotify] = useState(initial.published === false || isNew);
-  const [state, action] = useActionState(savePost, undefined);
+  const [state, action] = useActionState(savePostAction, undefined);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -45,10 +59,10 @@ export function PostForm({
   }
 
   async function insertImage(file?: File) {
-    if (!file) return;
+    if (!file || uploading) return;
     setUploading(true);
     try {
-      const url = await uploadImage(file, `posts/${post.slug || "new"}`);
+      const url = await track(uploadImage(file, `posts/${post.slug || "new"}`));
       insertBlock(`![Caption](${url})`);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Upload failed");

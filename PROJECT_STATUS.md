@@ -1,6 +1,6 @@
 # Sparks — project status
 
-A minimal, editorial guide to cafés, restaurants, shops and hidden gems across Nepal, with a personal journal and an admin dashboard. Design inspired by citylife.global; intro animation adapted from the anime.js logo intro.
+A minimal, editorial guide to cafés, restaurants, shops and hidden gems across Nepal, with a personal journal, a newsletter and an admin dashboard. Design inspired by citylife.global; intro animation adapted from the anime.js logo intro.
 
 _Last updated: 16 October 2026_
 
@@ -8,10 +8,20 @@ _Last updated: 16 October 2026_
 
 ## 1. Where things stand
 
-- The **site and admin are built** and tested on desktop and mobile, in light and dark mode.
-- **One place is live: Yala Garden Cafe & Restro.** On 16 October 2026 the 8,995 hidden drafts imported from OpenStreetMap were deleted; a backup is in `backups/osm-places-2026-10-16.json` (not in git).
-- **No place has a photo yet.** See [section 5](#5-photos--the-open-question) for the options.
-- The site is **not deployed** and the project is **not in git** yet.
+- **The site is live** at **https://sparks-one-neon.vercel.app** (Vercel). Pushing to `main` on GitHub (`aryan4859/Sparks`) deploys automatically.
+- **2 places are published**, both with your own photos: **Yala Garden Cafe & Restro** and **Himalayan Sip**. No journal stories yet.
+- **Newsletter works** (Gmail API): sign-ups confirm by email first (double opt-in), then get a welcome email, then an email for each new place or story you choose to send. 1 confirmed subscriber.
+- **Visitors can find what's open and nearby**: "Open now" and "Near me" filters, live "Open now · until 8:30pm" on place pages, and share buttons (WhatsApp, Viber, Facebook, copy link).
+- **Visitors can suggest places** at `/suggest`; suggestions arrive in the admin.
+- The **pre-launch audit is done** (security, error handling, edge cases, privacy, production settings). See section 3.
+- On 16 October 2026 the 8,995 hidden drafts imported from OpenStreetMap were deleted to start fresh; a backup is in `backups/osm-places-2026-10-16.json` (not in git).
+
+### Waiting on you (in this order)
+- [ ] **Re-run `supabase/schema.sql`** in the Supabase SQL Editor **first**. It adds the subscription-confirmation columns and the 5 MB photo upload limit. Until it's run, place/story emails fail (they now go only to confirmed subscribers)
+- [ ] **Commit and push** the latest work (confirmation email, Open now / Near me, share buttons, "Suggest a place", audit fixes). Pushing before the step above breaks the live newsletter
+- [ ] **Turn off public sign-ups** in Supabase: Authentication → Sign In / Providers → "Allow new users to sign up" (still on). Nobody can see or change anything today, but it closes the door for good. `npm run create-admin` keeps working.
+- [ ] **Add your Instagram profile URL** in `src/lib/site.ts` (`instagram`). The footer link stays hidden until then.
+- [ ] **Submit the sitemap to Google**: Search Console → add the site → Sitemaps → `sitemap.xml`.
 
 ---
 
@@ -22,10 +32,11 @@ _Last updated: 16 October 2026_
 | Framework | Next.js 16 (App Router) + React 19 + TypeScript | Server-rendered pages, good for SEO |
 | Styling | Tailwind CSS v4 | Colours are CSS variables → light and dark themes |
 | Database, auth, photos | Supabase (Postgres + Auth + Storage) | Free: 500 MB DB, 1 GB storage. **Pauses after 7 days with no traffic** |
-| Place data | OpenStreetMap (via the Overpass API) | Free, ODbL licence; credit shown in the footer |
+| Hosting | Vercel Hobby | Live. Hobby is **non-commercial only** |
+| Email | Gmail API from sparksby.shabnam@gmail.com | About **500 recipients a day**. Plain `fetch`, no email library |
 | Maps | Leaflet + OpenStreetMap tiles | No API key. Directions open in Google Maps via a link |
-| Animation | anime.js v4 | Intro preloader only |
-| Hosting (planned) | Vercel Hobby or Cloudflare Pages | Vercel Hobby is non-commercial only |
+| Animation | anime.js v4 (intro); plain JS (footsteps) | |
+| Place data (optional) | OpenStreetMap via the Overpass API | Import script kept, but the imported drafts were deleted |
 
 ---
 
@@ -33,192 +44,183 @@ _Last updated: 16 October 2026_
 
 ### Public site
 - [x] **Home page**: hero, featured place, neighbourhood links, handpicked spots, "new this week", one section per category, latest journal posts
-- [x] **Café / Restaurant / Shop pages**: search plus filters (type, area, budget, ambience, vegetarian), results grid next to a map
+- [x] **Café / Restaurant / Shop pages**: search plus filters (type, area, budget, ambience, vegetarian), results grid next to a map, "Suggest it →" link at the bottom
 - [x] **Explore map** (`/explore`): every published place on one map; pins open a popup with a Google Maps directions link
 - [x] **Place pages**: photo gallery, review ("Our take"), signature drinks/dishes with prices, menu with veg markers, map, hours, address, directions/website/Instagram buttons, nearby places with distances
 - [x] **Journal**: list page and post pages; posts can embed place cards and photos
-- [x] **Intro preloader**: big "sparks" letters draw → fill → outline → erase; the icon and wordmark assemble and fly into the navbar. Plays once per browser session, skipped for reduced-motion users and on `/admin`, with a 10-second failsafe. Lands pixel-exact on desktop and mobile
-- [x] **Dark mode**: follows the device setting by default; header toggle that remembers the choice; no flash on load
-- [x] **Monochrome design**: black, white and greys only (photos stay in colour)
-- [x] **Mobile**: full-screen menu, two-column cards, swipeable photo gallery, address + directions bar on place pages; intro scaled and centred. Tested at 390 px with no sideways overflow
-- [x] **OpenStreetMap credit** in the footer (required by its licence)
+- [x] **Intro preloader**: big "sparks" letters draw → fill → outline → erase; the icon and wordmark fly into the navbar. Once per browser session, skipped for reduced-motion users and on `/admin`, 10-second failsafe
+- [x] **Footsteps cursor trail**: footprints follow the mouse and land beside it when it stops. Mouse only (off on touch screens and for reduced motion), starts after the intro, never blocks clicks or scrolling. Strength/size at the top of `src/components/Footsteps.tsx`
+- [x] **Suggest a place** (`/suggest`): name, café/restaurant/shop, area, Google Maps link, note. Keeps what was typed if there's an error; "Suggest another" after sending
+- [x] **Newsletter sign-up** in the footer with **double opt-in**: a "Confirm your subscription" email → `/confirm` page with a button (not on page load, so email scanners can't confirm) → welcome email. Unconfirmed sign-ups are deleted after 30 days; confirmation emails go out at most once an hour per address, 30 an hour site-wide. One-click unsubscribe in every email (and from Gmail/Yahoo's own unsubscribe button)
+- [x] **"Open now" filter** (Nepal time) and **"Near me"** (asks for location only when tapped, rounds it to ~100 m, sorts nearest first, shows "66 m" / "1.0 km" on cards), in a **Now** row on the Cafés / Restaurants / Shops pages
+- [x] **Live opening status** on place pages ("Open now · until 8:30pm", "Closed · opens tomorrow 9am") with tidy hours ("Every day 9am–8:30pm"). The hours reader (`src/lib/hours.ts`) understands am/pm, 24-hour times, day ranges, "daily", "24/7", "closed" days and late nights; it read 95% of the old OpenStreetMap formats
+- [x] **Share buttons** on place pages and at the end of stories: WhatsApp, Facebook, copy link everywhere; Viber and the phone's own share sheet on phones
+- [x] **Privacy Policy** (`/privacy`) and **Terms of Use** (`/terms`), linked in the footer and under the newsletter box
+- [x] **Styled 404 and error pages** ("This corner is empty", "Something went wrong" with Try again)
+- [x] **Dark mode**, **monochrome design**, **mobile layout** (tested at 390 px, no sideways scroll), **OpenStreetMap credit**
+
+### SEO
+- [x] `/sitemap.xml` (every published place and story) and `/robots.txt` (keeps `/admin`, `/api`, `/unsubscribe` out of search)
+- [x] Structured data for Google: `CafeOrCoffeeShop` / `Restaurant` / `Store` with address, map pin, price range, photos and simple opening hours; `BlogPosting` for stories
+- [x] Canonical URLs and social-preview tags (the cover photo is the preview image)
 
 ### Admin dashboard (`/admin`)
-- [x] Email + password login (Supabase Auth); only accounts in the `admins` table can get in
-- [x] **Built for thousands of places**: search by name, filters (published/drafts, category, city), 50 per page; saving returns you to the same filtered page
-- [x] Places: create/edit/delete, drafts, "featured" flag, cover + gallery upload (shrunk to WebP in the browser), reorder photos, paste a Google Maps link to fill coordinates, signature items, menu editor
-- [x] **Drafts can be saved without a photo**; a cover photo is only required to publish
-- [x] **A draft's URL (slug) can be edited until it's published**, then it's locked so links don't break
-- [x] Journal: create/edit/delete, cover photo, body editor with buttons to insert a heading, a photo or a place card
-- [x] Saving refreshes the public site immediately
-- [x] Security: row-level security in Postgres, so only admins can write, even with the public key; server actions also re-check admin status
+- [x] Email + password login; only accounts in the `admins` table get in
+- [x] **Opening hours preview** in the place editor: "✓ Understood as: Every day 9am–8:30pm", or "Not understood" (then "Open now" leaves the place out)
+- [x] **Places**: search, filters, 50 per page; create/edit/delete, drafts, "featured", cover + gallery upload (shrunk to WebP in the browser), reorder photos, Google Maps link → coordinates, signature items, menu editor. A draft's URL can change until it's published
+- [x] **Journal**: create/edit/delete, cover photo, body editor with heading / photo / place-card buttons
+- [x] **"Email to N subscribers"** checkbox on places and stories: each is sent **at most once**; the editor then shows "Emailed to N subscribers on …" or why sending stopped
+- [x] **Subscribers** tab: confirmed, waiting for confirmation, and left; **Erase** permanently removes an address (privacy requests)
+- [x] **Suggestions** tab (with a count badge): **Create draft →** opens a new place pre-filled from the suggestion (name, type, area, location when the link has coordinates); saving it clears the suggestion. **Dismiss** removes it
+- [x] Save waits for photo uploads to finish; delete buttons confirm, show progress and report errors
 
-### Data
-- [x] **Sample content removed**: the 12 fictional places and 3 sample stories are deleted from the database, and the sample files and placeholder photos (picsum.photos) are deleted from the code
-- [x] **8,996 real places were imported as hidden drafts** (`npm run import-osm`), then deleted on 16 October 2026 to start fresh. Import stats, for reference:
-
-  | | |
-  |---|---|
-  | Cafés / restaurants | 1,872 / 7,124 |
-  | Name + exact location | all |
-  | Neighbourhood / city | 95% / 100% (looked up from OpenStreetMap place names) |
-  | Opening hours | 795 |
-  | Website or social link | 240 |
-  | Photos, menus, prices, reviews | none, added by you when publishing |
-  | Top cities | Kathmandu 1,476 · Pokhara 1,131 · Lalitpur 1,087 · Tokha 651 · Siddharthanagar 360 · Kirtipur 247 |
-
-  **Don't re-run the import** unless you want all of them back: it adds every OpenStreetMap place that isn't in the database.
+### Security & reliability (pre-launch audit, 16 October 2026)
+- [x] **Database permissions tested as an anonymous visitor**: no access to drafts, subscribers, suggestions or the admin list; no writes; no storage uploads or listing
+- [x] **No secrets in the browser code**; `.env` never committed
+- [x] Every admin action re-checks admin status; the database checks again (row-level security)
+- [x] **Abuse limits**: 5 sign-ups and 5 suggestions per visitor per hour (approximate on Vercel); hard caps in the database of 30 welcome emails and 50 suggestions per hour; hidden bot trap on public forms
+- [x] **Input checks**: website/Instagram must be real web links (`javascript:` etc. rejected); photos must be your uploads; every place field trimmed and length-capped; suggestion text tidied (emoji and Nepali text kept)
+- [x] Saves and deletes report an error instead of a false "saved" when nothing changed
+- [x] **Network drops**: every form shows "Couldn't reach the server" and keeps what was typed, instead of crashing the page
+- [x] Photo uploads: images only, 30 MB max before shrinking, clear message for iPhone HEIC; one upload per slot at a time
+- [x] **Security headers** on every page (no framing/clickjacking, nosniff, referrer policy, HSTS, permissions policy)
+- [x] **No cookie banner needed**: visitors get no cookies, analytics or tracking (checked in a browser). Revisit if you add Google Analytics
 
 ### Scripts
 | Command | What it does |
 |---|---|
-| `npm run dev` | Run the site at http://localhost:3000 |
+| `npm run dev -- -p 3001` | Run the site at http://localhost:3001 (port 3000 is used by another app on this computer) |
 | `npm run create-admin -- email "password"` | Create an admin, or reset an admin's password |
-| `npm run import-osm -- --dry-run` | Preview what the OpenStreetMap import would add |
-| `npm run import-osm` | Add OpenStreetMap places as hidden drafts (re-adds the ~9,000 deleted ones) |
+| `npm run gmail-auth` | One-time Gmail connection; prints `GMAIL_REFRESH_TOKEN` |
+| `npm run import-osm -- --dry-run` | Preview an OpenStreetMap import |
+| `npm run import-osm` | Add OpenStreetMap places as hidden drafts (**re-adds the ~9,000 deleted ones**) |
 
 ---
 
 ## 4. Running it
 
-`.env` needs:
+**Settings:** copy `.env.example` to `.env` and fill it in. The same keys go into Vercel → Project → Settings → Environment Variables (except `SUPABASE_SECRET_KEY` / `SUPABASE_URL`, which only the npm scripts need). `NEXT_PUBLIC_SITE_URL` must be the live address on Vercel, or email links and the sitemap point to localhost. The Gmail keys can be named `GMAIL_…` or `GOOGLE_…`.
 
-```
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
-SUPABASE_SECRET_KEY=...          # scripts only — never NEXT_PUBLIC_, never commit, not needed on hosting
-```
+**Database:** run `supabase/schema.sql` in the Supabase SQL Editor. It's safe to re-run, and **must be re-run whenever it changes** (new tables or columns).
 
-Database: run `supabase/schema.sql` in the Supabase SQL Editor (safe to re-run).
+**Admin:** `/admin/login` (add admins with `npm run create-admin`).
 
-Admin: http://localhost:3000/admin/login (one admin account exists; add more with `npm run create-admin`)
+> **Known dev quirk:** the dev server sometimes doesn't pick up edits to `src/app/globals.css` or `.env`. If a change doesn't appear, stop and rerun the dev server.
 
-> **Known dev quirk:** the dev server sometimes doesn't pick up edits to `src/app/globals.css`. If a style change doesn't appear, stop and rerun `npm run dev`.
-
-### Publishing a place (the curating workflow)
-1. `/admin` → **Drafts** + a city → **Filter** (or search a name)
-2. Open the place; add a cover photo (+ gallery), tagline, "Our take", budget, ambience, signature items / menu
-3. Fix the URL if it's an id like `restaurant-n12345` (places with Nepali-script names)
-4. Tick **Published** → save. It's live immediately
+### Publishing a place
+1. `/admin` → **+ New place** (or **Suggestions → Create draft →**)
+2. Add a cover photo (+ gallery), tagline, "Our take", budget, ambience, signature items / menu; paste a Google Maps link for the location
+3. Tick **Published**, and leave **Email to N subscribers** ticked to announce it → **Save**. It's live immediately
 
 ### Where things live
 
 | What | File |
 |---|---|
 | Colours, light/dark themes | `src/app/globals.css` |
-| Site name, price labels, helpers | `src/lib/site.ts` |
+| Site name, Instagram, price labels, site address | `src/lib/site.ts` |
 | Public database reads | `src/lib/queries.ts` |
-| Admin save/delete logic | `src/app/admin/actions.ts` |
-| Admin list (search, filters, pages) | `src/app/admin/(dashboard)/page.tsx` |
-| Logo | `src/components/SparksLogo.tsx` |
-| Intro animation | `src/components/preloader/` |
+| Admin save/delete/email logic | `src/app/admin/actions.ts` |
+| Public form actions (subscribe, confirm, suggest, unsubscribe) | `src/app/(site)/actions.ts` |
+| Opening hours reader / "Open now" | `src/lib/hours.ts`, `src/components/OpenStatus.tsx` |
+| Filters, "Near me" | `src/components/Filters.tsx`, `src/components/NearMeChip.tsx` |
+| Share buttons | `src/components/ShareButtons.tsx` |
+| Admin list, subscribers, suggestions | `src/app/admin/(dashboard)/page.tsx` |
+| Emails (layout, Gmail sending) | `src/lib/newsletter.ts` |
+| Input checks (links, images, slugs, map links) | `src/lib/validate.ts` |
+| Spam limits | `src/lib/rate-limit.ts` |
+| Sitemap / robots / structured data | `src/app/sitemap.ts`, `src/app/robots.ts`, `src/components/JsonLd.tsx` |
+| Security headers | `next.config.ts` |
+| Privacy / Terms | `src/app/(site)/privacy/page.tsx`, `src/app/(site)/terms/page.tsx` |
+| Intro animation / footsteps | `src/components/preloader/`, `src/components/Footsteps.tsx` |
 | Database schema | `supabase/schema.sql` |
-| OpenStreetMap import | `scripts/import-osm.mjs` |
-| Admin account script | `scripts/create-admin.mjs` |
 
 ---
 
-## 5. Photos — the open question
+## 5. Photos
 
-The imported places have **no photos**: OpenStreetMap has almost none (7 of 9,883). Photos from Google Search, Google Maps, Instagram or the places' websites **can't be copied**. They belong to the photographers (often the cafés and their customers), and re-publishing them risks takedown notices and breaks Google's terms. Publishing currently requires a cover photo.
-
-Options, best first. **Not decided yet; parked for now.**
+**Decided: your own photos.** Both live places use them, and they're what makes the guide feel handpicked. Photos from Google, Instagram or the places' websites **can't be copied** (they belong to the photographers). For later, if needed:
 
 | Option | Cost | Notes |
 |---|---|---|
-| Your own photos when you visit | Free | Best quality, and what makes the guide feel handpicked |
 | Ask the places (Instagram DM) for 2–3 photos with credit | Free | Most small cafés say yes to free promotion |
-| **Google Places API** (official) | Needs a Google Cloud billing account; monthly free allowance, then pay per photo view | Photos load live from Google with photographer credit (they can't be stored). Would add a "Find on Google" button in the admin and only load photos for published places. Setup: enable **Places API (New)**, add `GOOGLE_MAPS_API_KEY` to `.env` |
-| Wikimedia Commons "free photos nearby" finder in the admin | Free | Openly licensed, credit added automatically. Good for landmarks, often empty for small cafés |
-| Publish without a photo, using a typographic cover (name on grey) | Free | Lets places go live now and look intentional; add photos later |
+| Google Places API (official) | Billing account; free allowance, then pay per view | Photos load live from Google with credit; can't be stored |
+| Wikimedia Commons finder | Free | Good for landmarks, usually empty for small cafés |
 
 ---
 
-## 6. Before launch — must do
+## 6. Before growing
 
-- [ ] **Publish real places.** Curate drafts (section 4); aim for 10–20 well-photographed places first
-- [ ] **Decide on photos** (section 5)
-- [ ] **Set up git** and push to GitHub. There's no history or backup yet
-- [ ] **Deploy** to Vercel or Cloudflare Pages with the two `NEXT_PUBLIC_` env vars. Don't add `SUPABASE_SECRET_KEY` to hosting
-- [ ] **Run a production build** (`npm run build`) against the real database
-- [ ] **Map tiles.** OpenStreetMap's free tiles aren't meant for heavy traffic; move to a free-tier provider (MapTiler or Stadia, free key)
-- [ ] **Domain.** `.com.np` is free for Nepali citizens (register.com.np)
-- [ ] **Keep Supabase awake.** Free projects pause after 7 days without traffic; real visitors prevent it, or add a free weekly ping (GitHub Action / cron-job.org)
-- [ ] **Vercel Hobby is non-commercial.** If you add ads, sponsored listings or affiliate links, use Cloudflare Pages or upgrade
+- [ ] **Publish more places.** Aim for 10–20 well-photographed ones before promoting the site
+- [ ] **Write the first journal story** (it's emailed to subscribers too)
+- [ ] **Domain.** `.com.np` is free for Nepali citizens (register.com.np). Then set `NEXT_PUBLIC_SITE_URL` to it
+- [ ] **Send email from your own domain** once the list passes ~100–200 people: Gmail's ~500/day cap, and more emails landing in Promotions/Spam. A free-tier sender (Resend, Brevo) with your domain verified fixes both
+- [ ] **Map tiles.** OpenStreetMap's free tiles aren't meant for heavy traffic; move to MapTiler or Stadia (free key) as visits grow
+- [ ] **Keep Supabase awake.** Free projects pause after 7 days without traffic; real visitors prevent it, or add a free weekly ping (cron-job.org)
+- [ ] **Vercel Hobby is non-commercial.** If you add ads, sponsored listings or affiliate links, upgrade or move to Cloudflare Pages
 
 ---
 
 ## 7. Things to improve
 
-### Data quality (imported places)
-- [ ] Some OpenStreetMap details are outdated or odd (e.g. hours "09:00-09:00"); check them when you visit
-- [ ] Some places will have closed. Delete them as you find them
-- [ ] Opening hours are raw OpenStreetMap text (e.g. `Mo-Su 10:00-21:30`); show them in friendlier form
-- [ ] Some city labels come from the nearest town (e.g. "Tokha" for places just north of Kathmandu). Fine for filtering; adjust per place if needed
-- [ ] The admin city filter lists the most common cities from a sample of rows; make it exact with a small database function
+### Newsletter
+- [x] ~~"Confirm your subscription" email (double opt-in)~~
+- [ ] Send from your own domain (see section 6)
 
 ### Content & SEO
-- [ ] `sitemap.xml` and `robots.txt` so Google finds every published place and post
-- [ ] Structured data (JSON-LD `Restaurant` / `CafeOrCoffeeShop` / `Store`) for rich results
-- [ ] Social share images per place and post
-- [ ] A styled 404 page (currently the Next.js default), plus loading and error states
+- [ ] Designed social-share cards (currently the cover photo)
 - [ ] Image alt text editable in the admin
 - [ ] "Prices last checked" should show a real date per listing
 
 ### Search & filters
-- [ ] Public search matches simple word fragments; switch to Postgres full-text search with typo tolerance and romanised spellings ("momo", "mo:mo") as the published list grows
-- [ ] Allow several choices per filter row (e.g. Patan **and** Jhamsikhel)
-- [ ] Sort options: newest, nearest, budget
+- [ ] Postgres full-text search with typo tolerance and romanised spellings ("momo", "mo:mo") as the list grows
+- [ ] Several choices per filter row (e.g. Patan **and** Jhamsikhel); sort by newest, nearest, budget
 
 ### Admin
 - [ ] Deleting or replacing a photo doesn't remove the old file from storage, so unused files pile up toward the 1 GB limit
-- [ ] Bulk actions: delete or hide many drafts at once (e.g. all closed places in an area)
 - [ ] Preview a story before publishing; autosave drafts
-- [ ] Journal formatting is minimal (headings, photos, place cards); add bold, italic and links
+- [ ] Journal formatting: add bold, italic and links
 - [ ] Scheduled publishing
 
-### Intro & UX
-- [ ] The intro takes about 6.5 s. Consider a "Skip" button or a shorter version
-- [ ] Map pin clustering for when many places are published close together
-- [x] Newsletter: the footer form saves subscribers; publishing a story can email it to them (Gmail API, about 500 recipients a day), with one-click unsubscribe. Next: double opt-in (confirm email) to stop people signing up others
+### UX
+- [ ] The intro takes about 6.5 s; consider a "Skip" button or a shorter version
+- [ ] Map pin clustering once many places are close together
 
 ### Code quality
-- [ ] No automated tests. Add a few end-to-end checks (Playwright): home loads, filters work, admin login, intro lands in the nav
-- [ ] Cosmetic: two accent-stripping regexes (`src/components/admin/ui.tsx`, `scripts/import-osm.mjs`) contain literal characters instead of `\u` escapes (they work fine)
+- [ ] No automated tests yet. Add a few end-to-end checks (Playwright): home loads, filters work, forms submit, admin login
+- [ ] A full Content-Security-Policy (needs tuning around the map and the intro)
 
 ---
 
 ## 8. Feature ideas
 
 ### Quick wins
-1. **"Open now" filter**, using the opening hours already imported for 795 places
-2. **"Near me"**: sort by distance from the phone's location (the distance code exists for "Nearby")
-3. **More attributes:** wifi, power outlets, laptop-friendly, vegan, gluten-free, parking, pet-friendly, wheelchair access
-4. **Curated lists:** "Best momo in Patan", "Rainy-day cafés", "Date night"
-5. ~~**Newsletter**~~ done (Gmail API). Run `npm run gmail-auth` to set it up
-6. **Share buttons:** WhatsApp, Viber, Instagram story card
+1. **More attributes**: wifi, power outlets, laptop-friendly, vegan, parking, pet-friendly, wheelchair access
+2. **Curated lists**: "Best momo in Patan", "Rainy-day cafés", "Date night"
+3. **"Open now" badges** on place cards and the map
+4. **Designed share cards** (an image with the photo and name, for WhatsApp/Facebook previews)
+5. **Map pins for "Near me"**: show the visitor's position on the map
 
 ### Bigger features
-7. **Visitor accounts:** favourites and personal lists
+6. **Neighbourhood guides**: a page per area with map, intro and places
+7. **Saved places** on the visitor's device (no account needed)
 8. **Visitor reviews & ratings**, with admin moderation
-9. **"Suggest a place" form**: submissions arrive as drafts
-10. **Neighbourhood guides**: a page per area with map, intro and places
-11. **Nepali language** toggle
-12. **Events**: pop-ups, live music, new menus
-13. **PWA**: add to home screen, offline saved places
+9. **Nepali language** toggle
+10. **Events**: pop-ups, live music, new menus
+11. **PWA**: add to home screen
 
 ### For you as the admin
-14. **Analytics** (Cloudflare Web Analytics or Umami, free)
-15. **CSV import** for places
-16. **Photo helpers** (see section 5)
-17. **Monetisation (later)**: featured listings, affiliate links. Needs commercial hosting
+12. **Analytics** (Cloudflare Web Analytics or Umami: free, cookie-free, so still no banner needed)
+13. **Monetisation (later)**: featured listings, affiliate links. Needs commercial hosting
+
+### Done from this list
+- ~~Newsletter~~ · ~~Confirm-your-subscription email~~ · ~~Suggest a place~~ · ~~Sitemap + structured data~~ · ~~Styled 404/error pages~~ · ~~Share buttons~~ · ~~"Open now"~~ · ~~"Near me"~~ · ~~Friendlier opening hours~~
 
 ---
 
 ## 9. Suggested next steps
 
-1. Sign in, filter **Drafts → Kathmandu** (or your area), and publish 5–10 places you know well, with your own photos
-2. Decide on the photo approach (section 5)
-3. Set up git and push to GitHub
-4. Deploy to Vercel or Cloudflare on a free subdomain and try it on your phone
-5. SEO basics (sitemap + structured data), then "Open now" and "Near me"
+1. **Finish "Waiting on you"** (section 1), **schema first, then push**; then turn off public sign-ups, add your Instagram URL, submit the sitemap
+2. **Publish more places** with your photos (check the hours preview says "✓ Understood"), and write the first journal story
+3. **Get a domain** (`.com.np` is free), then send email from it
+4. **More attributes** (wifi, laptop-friendly, parking…) and **curated lists**
+5. **Neighbourhood guides**

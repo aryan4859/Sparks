@@ -8,12 +8,13 @@ import { parsePostBody } from "@/lib/markdown";
 import { newsletterReady, sendNewPlace, sendNewPost } from "@/lib/newsletter";
 import { safeAdminPath } from "@/lib/site";
 import { currentAdmin, sessionClient } from "@/lib/supabase/server";
-import type { Place } from "@/lib/types";
+import type { MenuItem, Place } from "@/lib/types";
 import { cleanHttpUrl, isAllowedImage } from "@/lib/validate";
 
 export type FormState = { error?: string } | undefined;
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Every mutation re-checks admin status; RLS enforces it again in the database. */
 async function requireAdmin() {
@@ -24,6 +25,20 @@ async function requireAdmin() {
 
 function refreshSite() {
   revalidatePath("/", "layout");
+}
+
+/** A trimmed string of at most `max` characters ("" for anything that isn't a string). */
+const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+
+/** One menu or signature item, reduced to the fields the site uses. */
+function menuItem(i: Partial<MenuItem> | null | undefined): MenuItem {
+  const price = Number(i?.price);
+  return {
+    name: text(i?.name, 120),
+    price: Number.isFinite(price) && price >= 0 ? Math.round(price) : 0,
+    ...(text(i?.description, 300) ? { description: text(i?.description, 300) } : {}),
+    ...(i?.veg === true ? { veg: true } : {}),
+  };
 }
 
 /**
@@ -118,7 +133,7 @@ export async function savePlace(_: FormState, formData: FormData): Promise<FormS
     return { error: "Couldn't read the form — please try again." };
   }
 
-  place.name = place.name?.trim();
+  place.name = text(place.name, 120);
   if (!place.name) return { error: "Name is required." };
   if (!SLUG.test(place.slug)) return { error: "Slug may only contain lowercase letters, numbers and single hyphens." };
   const publishing = place.published !== false;
@@ -140,11 +155,28 @@ export async function savePlace(_: FormState, formData: FormData): Promise<FormS
     place[key] = url;
   }
 
-  // Drop blank rows left over from the editor.
-  place.signature = place.signature.filter((i) => i.name?.trim());
+  // Trim text, cap lengths, and keep only known fields: the payload comes from the
+  // browser, so nothing unexpected reaches the database. Blank editor rows are dropped.
+  place.type = text(place.type, 80);
+  place.neighborhood = text(place.neighborhood, 80);
+  place.city = text(place.city, 80);
+  place.tagline = text(place.tagline, 200);
+  place.review = text(place.review, 10000);
+  place.hours = text(place.hours, 300) || undefined;
+  place.ambience = [...new Set((Array.isArray(place.ambience) ? place.ambience : []).map((a) => text(a, 40)).filter(Boolean))].slice(0, 20);
+  place.gallery = place.gallery.filter((g): g is string => typeof g === "string" && g !== "").slice(0, 30);
+  if (place.location) {
+    const { lat, lng } = place.location;
+    place.location =
+      Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng, address: text(place.location.address, 300) } : undefined;
+  }
+  if (![1, 2, 3].includes(place.budget)) place.budget = 2;
+  if (!["cafe", "restaurant", "shop"].includes(place.category)) return { error: "Pick a category." };
+  place.signature = place.signature.map(menuItem).filter((i) => i.name).slice(0, 50);
   place.menu = place.menu
-    .map((s) => ({ ...s, items: (s.items ?? []).filter((i) => i.name?.trim()) }))
-    .filter((s) => s.title?.trim() || s.items.length);
+    .map((sec) => ({ title: text(sec?.title, 80), items: (Array.isArray(sec?.items) ? sec.items : []).map(menuItem).filter((i) => i.name).slice(0, 200) }))
+    .filter((sec) => sec.title || sec.items.length)
+    .slice(0, 30);
 
   // Drafts may be renamed; published places keep their URL (enforced again here).
   const originalSlug = String(formData.get("originalSlug") || place.slug);
@@ -167,6 +199,12 @@ export async function savePlace(_: FormState, formData: FormData): Promise<FormS
   }
   if (!data?.length) return { error: `This place couldn't be saved. ${GONE}` };
   refreshSite();
+  // Created from a visitor's suggestion: it's been handled, so clear it from the inbox.
+  const suggestionId = String(formData.get("suggestionId") ?? "");
+  if (isNew && UUID.test(suggestionId)) {
+    const { error: clearError } = await supabase.from("suggestions").delete().eq("id", suggestionId);
+    if (clearError) console.error(`Couldn't clear suggestion ${suggestionId}: ${clearError.message}`);
+  }
   if (publishing && formData.get("notify") === "on") {
     await emailSubscribersOnce(supabase, "places", place.slug, place.name, () => sendNewPlace(supabase, place));
   }
@@ -239,4 +277,27 @@ export async function deletePost(slug: string): Promise<FormState> {
   if (!data?.length) return { error: `Nothing was deleted. ${GONE}` };
   refreshSite();
   redirect("/admin?tab=journal");
+}
+
+// ─── Suggestions ─────────────────────────────────────────────────────────
+
+export async function dismissSuggestion(id: string): Promise<FormState> {
+  const supabase = await requireAdmin();
+  const { data, error } = await supabase.from("suggestions").delete().eq("id", id).select("id");
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: `Nothing was dismissed. ${GONE}` };
+  revalidatePath("/admin");
+  return undefined;
+}
+
+// ─── Subscribers ─────────────────────────────────────────────────────────
+
+/** Permanently erases a subscriber (privacy requests). Unsubscribing only marks them as left. */
+export async function eraseSubscriber(email: string): Promise<FormState> {
+  const supabase = await requireAdmin();
+  const { data, error } = await supabase.from("subscribers").delete().eq("email", email).select("email");
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: `Nothing was erased. ${GONE}` };
+  revalidatePath("/admin");
+  return undefined;
 }
