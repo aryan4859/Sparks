@@ -1,4 +1,5 @@
-import { placeFromRow, postFromRow, type PlaceRow, type PostRow } from "./db";
+import { collectFacets, placeFromRow, postFromRow, type PlaceRow, type PostRow } from "./db";
+import { firstParam as first } from "./site";
 import { publicClient } from "./supabase/clients";
 import { dbError } from "./supabase/errors";
 import type { Budget, Category, Place } from "./types";
@@ -19,8 +20,6 @@ export type PlaceFilters = {
 };
 
 type SearchParams = Record<string, string | string[] | undefined>;
-
-const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || undefined;
 
 export function parseFilters(sp: SearchParams, category?: Category): PlaceFilters {
   const budget = Number(first(sp.budget));
@@ -92,12 +91,7 @@ export async function getFacets(category?: Category) {
   if (category) query = query.eq("category", category);
   const { data, error } = await query.returns<Pick<PlaceRow, "type" | "neighborhood" | "ambience">[]>();
   if (error) throw dbError(error);
-  const uniq = (xs: string[]) => [...new Set(xs.filter(Boolean))].sort();
-  return {
-    areas: uniq(data.map((p) => p.neighborhood)),
-    types: uniq(data.map((p) => p.type)),
-    ambience: uniq(data.flatMap((p) => p.ambience ?? [])),
-  };
+  return collectFacets(data);
 }
 
 function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {

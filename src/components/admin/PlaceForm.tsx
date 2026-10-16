@@ -5,29 +5,10 @@ import { deletePlace, savePlace } from "@/app/admin/actions";
 import { budgetHint, budgetLabel } from "@/lib/site";
 import type { Budget, Category, MenuItem, MenuSection, Place } from "@/lib/types";
 import { ImageUpload } from "./ImageUpload";
-import { ErrorNote, Field, GhostButton, inputClass, Panel, slugify, SubmitButton } from "./ui";
+import { type Newsletter, NewsletterOption } from "./NewsletterOption";
+import { DeleteButton, ErrorNote, Field, GhostButton, inputClass, Panel, slugify, SubmitButton } from "./ui";
 
 export type Suggestions = { types: string[]; areas: string[]; ambience: string[] };
-
-export const emptyPlace = (): Place => ({
-  slug: "",
-  name: "",
-  category: "cafe",
-  type: "",
-  neighborhood: "",
-  city: "Kathmandu",
-  budget: 2,
-  ambience: [],
-  tagline: "",
-  review: "",
-  cover: "",
-  gallery: [],
-  signature: [],
-  menu: [],
-  featured: false,
-  published: true,
-  addedAt: new Date().toISOString().slice(0, 10),
-});
 
 /** Pulls coordinates out of a pasted Google Maps URL (…/@27.67,85.32,17z or ?q=27.67,85.32). */
 function coordsFromMapsLink(s: string) {
@@ -40,13 +21,17 @@ export function PlaceForm({
   isNew,
   suggestions,
   returnTo,
+  newsletter,
 }: {
   initial: Place;
   isNew: boolean;
   suggestions: Suggestions;
   returnTo: string;
+  newsletter: Newsletter;
 }) {
   const [place, setPlace] = useState<Place>(initial);
+  // Default on for places that haven't been published yet; opt-in for ones already live.
+  const [notify, setNotify] = useState(isNew || initial.published === false);
   const [slugTouched, setSlugTouched] = useState(!isNew);
   // The URL can change until a place is published; after that, links to it may exist.
   const slugEditable = isNew || initial.published === false;
@@ -165,6 +150,9 @@ export function PlaceForm({
               <input type="checkbox" checked={place.published !== false} onChange={(e) => set("published", e.target.checked)} />
               Published (uncheck to keep as draft)
             </label>
+          </div>
+          <div className="sm:col-span-2">
+            <NewsletterOption newsletter={newsletter} published={place.published !== false} checked={notify} onChange={setNotify} />
           </div>
         </div>
       </Panel>
@@ -321,15 +309,10 @@ export function PlaceForm({
           )}
         </div>
         {!isNew && (
-          <button
-            type="button"
-            className="text-sm text-danger hover:underline"
-            onClick={() => {
-              if (confirm(`Delete “${place.name}”? This can't be undone.`)) deletePlace(place.slug);
-            }}
-          >
-            Delete
-          </button>
+          <DeleteButton
+            confirmText={`Delete “${place.name}”? This can't be undone.`}
+            action={() => deletePlace(initial.slug)}
+          />
         )}
       </div>
     </form>

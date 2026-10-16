@@ -9,8 +9,7 @@ _Last updated: 16 October 2026_
 ## 1. Where things stand
 
 - The **site and admin are built** and tested on desktop and mobile, in light and dark mode.
-- **8,996 real cafés and restaurants** from across Nepal are in the database as **hidden drafts** (imported from OpenStreetMap).
-- **Nothing is published yet**, so the public site is empty until you publish your first places.
+- **One place is live: Yala Garden Cafe & Restro.** On 16 October 2026 the 8,995 hidden drafts imported from OpenStreetMap were deleted; a backup is in `backups/osm-places-2026-10-16.json` (not in git).
 - **No place has a photo yet.** See [section 5](#5-photos--the-open-question) for the options.
 - The site is **not deployed** and the project is **not in git** yet.
 
@@ -56,7 +55,7 @@ _Last updated: 16 October 2026_
 
 ### Data
 - [x] **Sample content removed**: the 12 fictional places and 3 sample stories are deleted from the database, and the sample files and placeholder photos (picsum.photos) are deleted from the code
-- [x] **8,996 real places imported as hidden drafts** (`npm run import-osm`):
+- [x] **8,996 real places were imported as hidden drafts** (`npm run import-osm`), then deleted on 16 October 2026 to start fresh. Import stats, for reference:
 
   | | |
   |---|---|
@@ -68,7 +67,7 @@ _Last updated: 16 October 2026_
   | Photos, menus, prices, reviews | none, added by you when publishing |
   | Top cities | Kathmandu 1,476 · Pokhara 1,131 · Lalitpur 1,087 · Tokha 651 · Siddharthanagar 360 · Kirtipur 247 |
 
-  Re-running the import only adds places that are new on OpenStreetMap; it never duplicates or overwrites your edits.
+  **Don't re-run the import** unless you want all of them back: it adds every OpenStreetMap place that isn't in the database.
 
 ### Scripts
 | Command | What it does |
@@ -76,7 +75,7 @@ _Last updated: 16 October 2026_
 | `npm run dev` | Run the site at http://localhost:3000 |
 | `npm run create-admin -- email "password"` | Create an admin, or reset an admin's password |
 | `npm run import-osm -- --dry-run` | Preview what the OpenStreetMap import would add |
-| `npm run import-osm` | Add new OpenStreetMap places as hidden drafts |
+| `npm run import-osm` | Add OpenStreetMap places as hidden drafts (re-adds the ~9,000 deleted ones) |
 
 ---
 

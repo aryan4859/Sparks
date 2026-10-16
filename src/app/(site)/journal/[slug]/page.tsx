@@ -6,6 +6,7 @@ import { parsePostBody, readingMinutes } from "@/lib/markdown";
 import { budgetLabel, categories, formatDate } from "@/lib/site";
 import { getPlace, getPost, getPosts } from "@/lib/queries";
 import type { PostBlock } from "@/lib/types";
+import { isAllowedImage } from "@/lib/validate";
 
 export async function generateStaticParams() {
   return (await getPosts()).map((p) => ({ slug: p.slug }));
@@ -54,6 +55,8 @@ async function Block({ block }: { block: PostBlock }) {
     case "h":
       return <h2 className="pt-6 text-2xl font-semibold tracking-tight">{block.text}</h2>;
     case "img":
+      // Images from unsupported hosts would crash next/image; skip them instead.
+      if (!isAllowedImage(block.src)) return null;
       return (
         <figure className="-mx-4 py-4 sm:-mx-16">
           <div className="relative aspect-[16/10] bg-card">

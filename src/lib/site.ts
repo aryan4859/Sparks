@@ -40,3 +40,15 @@ export function formatDate(iso: string) {
 export function directionsUrl(lat: number, lng: number) {
   return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 }
+
+/** First value of a search param (Next gives string | string[] | undefined). */
+export function firstParam(v: string | string[] | undefined) {
+  return (Array.isArray(v) ? v[0] : v) || undefined;
+}
+
+/** Only allow returning to an admin page on this site (blocks open redirects like //evil.com). */
+export function safeAdminPath(path: unknown, fallback = "/admin") {
+  return typeof path === "string" && (path === "/admin" || path.startsWith("/admin/") || path.startsWith("/admin?"))
+    ? path
+    : fallback;
+}

@@ -101,3 +101,44 @@ export function placeToRow(p: Place): PlaceRow {
 export function postFromRow(r: PostRow): Post {
   return { ...r };
 }
+
+/** Blank place and story for the admin "new" forms. */
+export const emptyPlace = (): Place => ({
+  slug: "",
+  name: "",
+  category: "cafe",
+  type: "",
+  neighborhood: "",
+  city: "Kathmandu",
+  budget: 2,
+  ambience: [],
+  tagline: "",
+  review: "",
+  cover: "",
+  gallery: [],
+  signature: [],
+  menu: [],
+  featured: false,
+  published: true,
+  addedAt: new Date().toISOString().slice(0, 10),
+});
+
+export const emptyPost = (): Post => ({
+  slug: "",
+  title: "",
+  excerpt: "",
+  cover: "",
+  date: new Date().toISOString().slice(0, 10),
+  body: "",
+  published: true,
+});
+
+/** Distinct, sorted filter values (types, areas, ambience) from a set of place rows. */
+export function collectFacets(rows: Pick<PlaceRow, "type" | "neighborhood" | "ambience">[]) {
+  const uniq = (xs: string[]) => [...new Set(xs.filter(Boolean))].sort();
+  return {
+    types: uniq(rows.map((r) => r.type)),
+    areas: uniq(rows.map((r) => r.neighborhood)),
+    ambience: uniq(rows.flatMap((r) => r.ambience ?? [])),
+  };
+}

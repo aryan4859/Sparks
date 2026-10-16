@@ -1,5 +1,7 @@
 "use client";
 
+import { unstable_rethrow } from "next/navigation";
+import { useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 
 export const inputClass =
@@ -73,4 +75,35 @@ export function slugify(s: string) {
     .replace(/&/g, " and ")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+/** Delete with a confirm step, a pending state (no double clicks) and a visible error if it fails. */
+export function DeleteButton({ confirmText, action }: { confirmText: string; action: () => Promise<{ error?: string } | undefined> }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
+  return (
+    <div className="text-right">
+      <button
+        type="button"
+        disabled={pending}
+        className="text-sm text-danger hover:underline disabled:opacity-50"
+        onClick={() => {
+          if (!confirm(confirmText)) return;
+          setError(undefined);
+          startTransition(async () => {
+            try {
+              const result = await action();
+              if (result?.error) setError(result.error);
+            } catch (e) {
+              unstable_rethrow(e); // the redirect after a successful delete isn't an error
+              setError("Couldn't reach the server — check your connection and try again.");
+            }
+          });
+        }}
+      >
+        {pending ? "Deleting…" : "Delete"}
+      </button>
+      {error && <p className="mt-1 max-w-xs text-xs text-danger">{error}</p>}
+    </div>
+  );
 }

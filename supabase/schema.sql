@@ -104,6 +104,13 @@ create policy "Admins can delete posts" on public.posts
 -- When the story was emailed to subscribers (null = not yet). Claimed atomically
 -- before sending, so a story is never emailed twice.
 alter table public.posts add column if not exists notified_at timestamptz;
+-- How many emails went out, and why sending stopped early (shown in the editor).
+alter table public.posts add column if not exists notified_count integer;
+alter table public.posts add column if not exists notify_error text;
+-- Same for places: new places can be emailed to subscribers too.
+alter table public.places add column if not exists notified_at timestamptz;
+alter table public.places add column if not exists notified_count integer;
+alter table public.places add column if not exists notify_error text;
 
 -- ─── Newsletter subscribers ──────────────────────────────────────────────
 create table if not exists public.subscribers (
@@ -116,18 +123,29 @@ alter table public.subscribers enable row level security;
 
 -- Visitors never touch the table directly: they go through these two functions.
 -- Returns the unsubscribe token for a new or returning subscriber (who then gets a
--- welcome email), or null if they're already subscribed.
+-- welcome email), or null if they're already subscribed. Past 30 sign-ups in an
+-- hour it still subscribes but returns null, so a bot flooding the form can't use
+-- up the Gmail sending allowance with welcome emails.
 drop function if exists public.subscribe(text);
 create function public.subscribe(p_email text)
 returns uuid
-language sql
+language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  t uuid;
+begin
   insert into public.subscribers as s (email) values (lower(trim(p_email)))
   on conflict (email) do update set unsubscribed_at = null
     where s.unsubscribed_at is not null
-  returning s.token;
+  returning s.token into t;
+  if t is not null
+     and (select count(*) from public.subscribers where created_at > now() - interval '1 hour') > 30 then
+    return null;
+  end if;
+  return t;
+end;
 $$;
 
 create or replace function public.unsubscribe(p_token uuid)

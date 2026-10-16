@@ -2,6 +2,7 @@
 
 import { after } from "next/server";
 import { sendWelcome } from "@/lib/newsletter";
+import { clientIp, rateLimited } from "@/lib/rate-limit";
 import { publicClient } from "@/lib/supabase/clients";
 
 export type SubscribeState = { ok?: boolean; error?: string } | undefined;
@@ -15,6 +16,9 @@ export async function subscribe(_: SubscribeState, formData: FormData): Promise<
 
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!EMAIL.test(email) || email.length > 254) return { error: "That doesn't look like an email address." };
+  if (rateLimited(`subscribe:${await clientIp()}`, 5, 60 * 60 * 1000)) {
+    return { error: "Too many sign-ups from your connection — please try again in an hour." };
+  }
 
   // Returns the unsubscribe token only for new (or returning) subscribers, so
   // submitting the same address again can't trigger another welcome email.

@@ -1,7 +1,10 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Newsletter } from "@/components/admin/NewsletterOption";
 import type { PostRow } from "./db";
-import { formatDate, site } from "./site";
+import { dbError } from "./supabase/errors";
+import { categories, formatDate, site } from "./site";
+import type { Place } from "./types";
 
 /**
  * New-story emails, sent from a Gmail account through the Gmail API (plain fetch, no SDK).
@@ -108,6 +111,23 @@ ${button(url, "Read the story →")}`,
   return { html, text: text.join("\n") };
 }
 
+function renderPlace(place: Place, unsub: string) {
+  const url = `${SITE_URL}/places/${place.slug}`;
+  const where = [place.neighborhood, place.city].filter(Boolean).join(", ");
+  const kind = [categories[place.category].label, place.type].filter((x, i, a) => x && a.indexOf(x) === i).join(" · ");
+  const html = layout(
+    `<p style="margin:0 0 12px;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#777">New on ${esc(site.name)} · ${esc(kind)}</p>
+<h1 style="margin:0 0 6px;font-size:26px;line-height:1.2;letter-spacing:-0.02em">${esc(place.name)}</h1>
+${where ? `<p style="margin:0 0 14px;font-size:14px;color:#777">${esc(where)}</p>` : ""}
+${place.tagline ? `<p style="margin:0 0 24px;font-family:Georgia,serif;font-style:italic;font-size:18px;line-height:1.5;color:#555">${esc(place.tagline)}</p>` : ""}
+${button(url, "See the place →")}`,
+    unsub,
+    place.cover ? { src: place.cover, href: url } : undefined,
+  );
+  const text = [`New on ${site.name}: ${place.name}`, ...[where, place.tagline].filter(Boolean), "", `See it: ${url}`, "", `Unsubscribe: ${unsub}`];
+  return { html, text: text.join("\n") };
+}
+
 function renderWelcome(unsub: string) {
   const html = layout(
     `<h1 style="margin:0 0 14px;font-size:26px;line-height:1.2;letter-spacing:-0.02em">You're on the list</h1>
@@ -172,21 +192,26 @@ async function activeSubscribers(supabase: SupabaseClient) {
   }
 }
 
+type SendResult = { sent: number; error?: string };
+
 /**
- * Emails a newly published story to every active subscriber. Never throws:
- * returns how many were sent, plus an error if it stopped early.
+ * Emails every active subscriber. Never throws: returns how many were sent,
+ * plus an error if it stopped early.
  */
-export async function sendNewPost(supabase: SupabaseClient, post: PostRow): Promise<{ sent: number; error?: string }> {
+async function sendToAll(
+  supabase: SupabaseClient,
+  subject: string,
+  render: (unsub: string) => { html: string; text: string },
+): Promise<SendResult> {
   let sent = 0;
   try {
     if (!newsletterReady) throw new Error("not configured (GMAIL_* settings, NEWSLETTER_FROM, NEXT_PUBLIC_SITE_URL)");
     const [subscribers, token] = await Promise.all([activeSubscribers(supabase), gmailAccessToken()]);
-    const render = (unsub: string) => renderPost(post, unsub);
 
     for (let i = 0; i < subscribers.length; i += PARALLEL) {
       await Promise.all(
         subscribers.slice(i, i + PARALLEL).map(async (s) => {
-          await gmailSend(token, s, post.title, render);
+          await gmailSend(token, s, subject, render);
           sent++;
         }),
       );
@@ -196,4 +221,32 @@ export async function sendNewPost(supabase: SupabaseClient, post: PostRow): Prom
   } catch (e) {
     return { sent, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/** Emails a newly published journal story to every active subscriber. */
+export function sendNewPost(supabase: SupabaseClient, post: PostRow) {
+  return sendToAll(supabase, post.title, (unsub) => renderPost(post, unsub));
+}
+
+/** Emails a newly published place to every active subscriber. */
+export function sendNewPlace(supabase: SupabaseClient, place: Place) {
+  return sendToAll(supabase, `New on ${site.name}: ${place.name}`, (unsub) => renderPlace(place, unsub));
+}
+
+export type NotifyColumns = { notified_at: string | null; notified_count: number | null; notify_error: string | null };
+
+/** What the editor's "Email to N subscribers" option needs to know. Needs an admin session. */
+export async function newsletterStatus(supabase: SupabaseClient, row?: NotifyColumns | null): Promise<Newsletter> {
+  const { count, error } = await supabase
+    .from("subscribers")
+    .select("email", { count: "exact", head: true })
+    .is("unsubscribed_at", null);
+  if (error) throw dbError(error);
+  return {
+    ready: newsletterReady,
+    subscribers: count ?? 0,
+    emailedAt: row?.notified_at ?? null,
+    sentCount: row?.notified_count ?? null,
+    error: row?.notify_error ?? null,
+  };
 }

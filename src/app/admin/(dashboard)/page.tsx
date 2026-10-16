@@ -2,14 +2,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { placeFromRow, type PlaceRow, type PostRow } from "@/lib/db";
 import { newsletterReady } from "@/lib/newsletter";
-import { categories, formatDate } from "@/lib/site";
+import { categories, firstParam, formatDate } from "@/lib/site";
 import { dbError } from "@/lib/supabase/errors";
 import { sessionClient } from "@/lib/supabase/server";
 
 const PAGE_SIZE = 50;
 
 type SP = Record<string, string | string[] | undefined>;
-const one = (v: SP[string]) => (Array.isArray(v) ? v[0] : v) ?? "";
+const one = (v: SP[string]) => firstParam(v) ?? "";
 
 /** Builds an /admin URL from the current filters with some keys changed. */
 function adminHref(current: Record<string, string>, patch: Record<string, string | undefined>) {
@@ -53,7 +53,7 @@ async function PlacesList({ sp }: { sp: SP }) {
     // Cities for the filter dropdown, most common first
     supabase.from("places").select("city").neq("city", "").limit(10000).returns<{ city: string }[]>(),
   ]);
-  if (res.error) throw dbError(res.error);
+  for (const r of [res, published, cityRows]) if (r.error) throw dbError(r.error);
 
   const places = (res.data ?? []).map(placeFromRow);
   const total = res.count ?? 0;
@@ -232,6 +232,7 @@ async function SubscriberList() {
     supabase.from("subscribers").select("email", { count: "exact", head: true }).is("unsubscribed_at", null),
   ]);
   if (res.error) throw dbError(res.error);
+  if (active.error) throw dbError(active.error);
 
   return (
     <div className="space-y-6">

@@ -4,17 +4,8 @@ import { useActionState, useRef, useState } from "react";
 import { deletePost, savePost } from "@/app/admin/actions";
 import type { Post } from "@/lib/types";
 import { ImageUpload, uploadImage } from "./ImageUpload";
-import { ErrorNote, Field, GhostButton, inputClass, Panel, slugify, SubmitButton } from "./ui";
-
-export const emptyPost = (): Post => ({
-  slug: "",
-  title: "",
-  excerpt: "",
-  cover: "",
-  date: new Date().toISOString().slice(0, 10),
-  body: "",
-  published: true,
-});
+import { type Newsletter, NewsletterOption } from "./NewsletterOption";
+import { DeleteButton, ErrorNote, Field, GhostButton, inputClass, Panel, slugify, SubmitButton } from "./ui";
 
 export function PostForm({
   initial,
@@ -25,8 +16,7 @@ export function PostForm({
   initial: Post;
   isNew: boolean;
   places: { slug: string; name: string }[];
-  /** Whether emailing is set up, how many would get it, and whether this story already went out. */
-  newsletter: { ready: boolean; subscribers: number; emailedAt: string | null };
+  newsletter: Newsletter;
 }) {
   const [post, setPost] = useState(initial);
   const [slugTouched, setSlugTouched] = useState(!isNew);
@@ -167,52 +157,12 @@ export function PostForm({
           )}
         </div>
         {!isNew && (
-          <button
-            type="button"
-            className="text-sm text-danger hover:underline"
-            onClick={() => {
-              if (confirm(`Delete “${post.title}”? This can't be undone.`)) deletePost(post.slug);
-            }}
-          >
-            Delete
-          </button>
+          <DeleteButton
+            confirmText={`Delete “${post.title}”? This can't be undone.`}
+            action={() => deletePost(post.slug)}
+          />
         )}
       </div>
     </form>
-  );
-}
-
-function NewsletterOption({
-  newsletter,
-  published,
-  checked,
-  onChange,
-}: {
-  newsletter: { ready: boolean; subscribers: number; emailedAt: string | null };
-  published: boolean;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  if (newsletter.emailedAt) {
-    return (
-      <p className="text-xs text-muted">
-        Emailed to subscribers on {new Date(newsletter.emailedAt).toLocaleDateString("en-GB", { dateStyle: "long" })}.
-      </p>
-    );
-  }
-  if (!newsletter.ready) {
-    return (
-      <p className="text-xs text-muted">
-        Emailing subscribers is off: set the GMAIL_* settings, NEWSLETTER_FROM and NEXT_PUBLIC_SITE_URL in .env (see PROJECT_STATUS.md).
-      </p>
-    );
-  }
-  const n = newsletter.subscribers.toLocaleString();
-  return (
-    <label className="flex items-center gap-2 text-sm">
-      <input name="notify" type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      Email to {n} subscriber{newsletter.subscribers === 1 ? "" : "s"}
-      <span className="text-xs text-muted">{published ? "when saved" : "once published"}</span>
-    </label>
   );
 }
