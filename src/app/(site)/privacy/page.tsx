@@ -46,6 +46,12 @@ export default function PrivacyPage() {
           email us with the place and what you wrote.
         </p>
         <p>
+          <strong>If you use &ldquo;Ask Sparks&rdquo;:</strong> your questions are sent, with the conversation so far, to
+          OpenRouter and the AI model provider it routes them to, to write the answer. We don&apos;t store chats, but those
+          services may log them, and free models may use them to improve their models. Please don&apos;t share personal details
+          in the chat.
+        </p>
+        <p>
           <strong>If you tap &ldquo;Near me&rdquo;:</strong> your browser asks your permission, then shares your approximate location
           (rounded to about 100 metres) with that page request so places can be sorted by distance. It isn&apos;t stored.
         </p>
@@ -80,6 +86,13 @@ export default function PrivacyPage() {
             OpenStreetMap&apos;s servers, which can see your IP address. See the{" "}
             <a href="https://osmfoundation.org/wiki/Privacy_Policy" target="_blank" rel="noreferrer">
               OpenStreetMap privacy policy
+            </a>
+            .
+          </li>
+          <li>
+            <strong>OpenRouter</strong> and the AI model providers it uses answer questions in &ldquo;Ask Sparks&rdquo;. See the{" "}
+            <a href="https://openrouter.ai/privacy" target="_blank" rel="noreferrer">
+              OpenRouter privacy policy
             </a>
             .
           </li>

@@ -35,6 +35,14 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
+      <LegalSection title="Ask Sparks (the AI assistant)">
+        <p>
+          &ldquo;Ask Sparks&rdquo; answers with an AI model, using the places on {site.name}. AI can be wrong: opening hours,
+          prices and details may be out of date or misread, so check before you go. Don&apos;t rely on it for anything important,
+          and don&apos;t share personal details in the chat.
+        </p>
+      </LegalSection>
+
       <LegalSection title="Reviews you write">
         <ul>
           <li>Write about your own, recent visit, honestly. No reviews of your own business or its competitors, and no paid reviews.</li>
