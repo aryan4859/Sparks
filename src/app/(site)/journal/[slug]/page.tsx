@@ -2,13 +2,16 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { JsonLd, postJsonLd } from "@/components/JsonLd";
+import { PostHeading, PostImage, PostParagraph } from "@/components/PostBlocks";
 import { ShareButtons } from "@/components/ShareButtons";
 import { notFound } from "next/navigation";
 import { parsePostBody, readingMinutes } from "@/lib/markdown";
 import { budgetLabel, categories, formatDate, siteUrl } from "@/lib/site";
 import { getPlace, getPost, getPosts } from "@/lib/queries";
 import type { PostBlock } from "@/lib/types";
-import { isAllowedImage } from "@/lib/validate";
+
+// Re-check every 10 minutes, so scheduled stories appear on time even without the cron job.
+export const revalidate = 600;
 
 export async function generateStaticParams() {
   return (await getPosts()).map((p) => ({ slug: p.slug }));
@@ -67,20 +70,11 @@ export default async function PostPage({ params }: PageProps<"/journal/[slug]">)
 async function Block({ block }: { block: PostBlock }) {
   switch (block.type) {
     case "p":
-      return <p>{block.text}</p>;
+      return <PostParagraph text={block.text} />;
     case "h":
-      return <h2 className="pt-6 text-2xl font-semibold tracking-tight">{block.text}</h2>;
+      return <PostHeading text={block.text} />;
     case "img":
-      // Images from unsupported hosts would crash next/image; skip them instead.
-      if (!isAllowedImage(block.src)) return null;
-      return (
-        <figure className="-mx-4 py-4 sm:-mx-16">
-          <div className="relative aspect-[16/10] bg-card">
-            <Image src={block.src} alt={block.caption ?? ""} fill sizes="(min-width: 768px) 800px, 100vw" className="object-cover" />
-          </div>
-          {block.caption && <figcaption className="mt-2 px-4 text-sm text-muted sm:px-16">{block.caption}</figcaption>}
-        </figure>
-      );
+      return <PostImage src={block.src} caption={block.caption} />;
     case "place": {
       const place = await getPlace(block.slug);
       if (!place) return null;

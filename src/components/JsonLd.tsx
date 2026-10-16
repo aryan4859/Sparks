@@ -1,5 +1,5 @@
 import { budgetHint, categories, features, isFeature, site, siteUrl } from "@/lib/site";
-import type { Place, Post } from "@/lib/types";
+import type { Place, Post, Review } from "@/lib/types";
 
 /**
  * Structured data (schema.org JSON-LD) so search engines can show rich results:
@@ -15,7 +15,7 @@ const schemaType = { cafe: "CafeOrCoffeeShop", restaurant: "Restaurant", shop: "
 // schema.org accepts hours like "Mo-Fr 08:00-18:00; Sa 09:00-14:00" — only pass ones in that shape.
 const SIMPLE_HOURS = /^([A-Z][a-z](-[A-Z][a-z])?(,[A-Z][a-z](-[A-Z][a-z])?)* \d{2}:\d{2}-\d{2}:\d{2})(;\s*[A-Z][a-z](-[A-Z][a-z])?(,[A-Z][a-z](-[A-Z][a-z])?)* \d{2}:\d{2}-\d{2}:\d{2})*$/;
 
-export function placeJsonLd(place: Place) {
+export function placeJsonLd(place: Place, reviews: Review[] = []) {
   const loc = place.location;
   const sameAs = [place.instagram, place.website].filter(Boolean);
   return {
@@ -43,6 +43,25 @@ export function placeJsonLd(place: Place) {
       : {}),
     ...(place.hours && SIMPLE_HOURS.test(place.hours.trim()) ? { openingHours: place.hours.trim() } : {}),
     ...(sameAs.length ? { sameAs } : {}),
+    // Approved visitor reviews: the star rating Google can show in results.
+    ...(reviews.length
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: Number((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)),
+            reviewCount: reviews.length,
+            bestRating: 5,
+            worstRating: 1,
+          },
+          review: reviews.slice(0, 5).map((r) => ({
+            "@type": "Review",
+            reviewRating: { "@type": "Rating", ratingValue: r.rating, bestRating: 5 },
+            author: { "@type": "Person", name: r.name || "A visitor" },
+            datePublished: r.createdAt.slice(0, 10),
+            ...(r.body ? { reviewBody: r.body } : {}),
+          })),
+        }
+      : {}),
     ...(place.features.length
       ? {
           amenityFeature: place.features.filter(isFeature).map((f) => ({

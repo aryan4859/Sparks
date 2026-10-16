@@ -7,6 +7,9 @@ import { ListCard } from "@/components/ListCard";
 import { getAreas, getFeatured, getLatest, getLists, getPlaces, getPlacesBySlugs, getPosts } from "@/lib/queries";
 import type { Category } from "@/lib/types";
 
+// Re-check every 10 minutes, so scheduled stories appear on time even without the cron job.
+export const revalidate = 600;
+
 export default async function Home() {
   const [featured, latest, posts, areas, lists] = await Promise.all([
     getFeatured(),

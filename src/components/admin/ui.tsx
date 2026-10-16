@@ -138,3 +138,41 @@ export function DeleteButton({
     </div>
   );
 }
+
+/** A one-click action (e.g. Approve) with a pending state and a visible error if it fails. */
+export function ActionButton({
+  action,
+  label,
+  pendingLabel,
+}: {
+  action: () => Promise<{ error?: string } | undefined>;
+  label: string;
+  pendingLabel: string;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string>();
+  return (
+    <div>
+      <button
+        type="button"
+        disabled={pending}
+        className="bg-ink px-4 py-2 text-sm text-paper hover:opacity-85 disabled:opacity-50"
+        onClick={() => {
+          setError(undefined);
+          startTransition(async () => {
+            try {
+              const result = await action();
+              if (result?.error) setError(result.error);
+            } catch (e) {
+              unstable_rethrow(e);
+              setError("Couldn't reach the server — check your connection and try again.");
+            }
+          });
+        }}
+      >
+        {pending ? pendingLabel : label}
+      </button>
+      {error && <p className="mt-1 max-w-xs text-xs text-danger">{error}</p>}
+    </div>
+  );
+}

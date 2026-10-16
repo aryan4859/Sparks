@@ -3,7 +3,7 @@ import { isOpen, parseHours } from "./hours";
 import { type Feature, firstParam as first, isFeature } from "./site";
 import { publicClient } from "./supabase/clients";
 import { dbError } from "./supabase/errors";
-import type { Area, Budget, Category, Place } from "./types";
+import type { Area, Budget, Category, Place, Review } from "./types";
 import { slugify } from "./validate";
 
 /**
@@ -239,4 +239,20 @@ export async function getArea(slug: string) {
   // slugify the same ("Patan", "patan ") belong together.
   const places = (await getPlaces()).filter((p) => slugify(p.neighborhood) === slug);
   return { ...area, places };
+}
+
+// ─── Reviews ─────────────────────────────────────────────────────────────
+
+/** Approved reviews for a place (newest first) with the average rating. */
+export async function getReviews(slug: string) {
+  const { data, error } = await publicClient()
+    .from("reviews")
+    .select("id, rating, body, name, created_at")
+    .eq("place_slug", slug)
+    .order("created_at", { ascending: false })
+    .returns<{ id: string; rating: number; body: string; name: string; created_at: string }[]>();
+  if (error) throw dbError(error);
+  const reviews: Review[] = data.map((r) => ({ id: r.id, rating: r.rating, body: r.body, name: r.name, createdAt: r.created_at }));
+  const average = reviews.length ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
+  return { reviews, average, count: reviews.length };
 }

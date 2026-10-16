@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { PostCard } from "@/components/PostCard";
 import { getPosts } from "@/lib/queries";
 
+// Re-check every 10 minutes, so scheduled stories appear on time even without the cron job.
+export const revalidate = 600;
+
 export const metadata: Metadata = { title: "Journal" };
 
 export default async function JournalPage() {

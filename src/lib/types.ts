@@ -57,6 +57,9 @@ export type CuratedList = {
   updatedAt?: string;
 };
 
+/** An approved visitor review, as shown on a place page. */
+export type Review = { id: string; rating: number; body: string; name: string; createdAt: string };
+
 /** Optional editorial content for a neighbourhood page. */
 export type Area = { slug: string; name: string; intro: string; cover: string };
 
@@ -75,4 +78,8 @@ export type Post = {
   /** Lightweight markdown — see src/lib/markdown.ts */
   body: string;
   published?: boolean;
+  /** Scheduled: hidden until this moment (ISO time) */
+  publishAt?: string;
+  /** Email subscribers when the scheduled time comes */
+  notifyPending?: boolean;
 };

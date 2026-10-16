@@ -11,9 +11,11 @@ export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const admin = await currentAdmin();
   if (!admin) redirect("/admin/login");
-  const { count: newSuggestions } = await (await sessionClient())
-    .from("suggestions")
-    .select("id", { count: "exact", head: true });
+  const supabase = await sessionClient();
+  const [{ count: newSuggestions }, { count: pendingReviews }] = await Promise.all([
+    supabase.from("suggestions").select("id", { count: "exact", head: true }),
+    supabase.from("reviews").select("id", { count: "exact", head: true }).eq("status", "pending"),
+  ]);
 
   return (
     <div className="flex-1 bg-surface">
@@ -29,7 +31,11 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
               <Link href="/admin?tab=journal" className="hover:text-ink">Journal</Link>
               <Link href="/admin?tab=lists" className="hover:text-ink">Lists</Link>
               <Link href="/admin?tab=areas" className="hover:text-ink">Areas</Link>
+              <Link href="/admin?tab=reviews" className="hover:text-ink">
+                Reviews{pendingReviews ? <span className="ml-1 bg-ink px-1.5 text-xs text-paper">{pendingReviews}</span> : null}
+              </Link>
               <Link href="/admin?tab=subscribers" className="hover:text-ink">Subscribers</Link>
+              <Link href="/admin?tab=photos" className="hover:text-ink">Photos</Link>
               <Link href="/admin?tab=suggestions" className="hover:text-ink">
                 Suggestions{newSuggestions ? <span className="ml-1 bg-ink px-1.5 text-xs text-paper">{newSuggestions}</span> : null}
               </Link>

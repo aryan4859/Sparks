@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MobileMenu } from "@/components/MobileMenu";
 import { SparksLogo } from "@/components/SparksLogo";
+import { SavedLink } from "@/components/SaveButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { site } from "@/lib/site";
 
@@ -27,6 +28,7 @@ export function Header() {
               {item.label}
             </Link>
           ))}
+          <SavedLink />
           <Link href="/explore" aria-label="Search" className="text-muted hover:text-ink">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="7" />
@@ -37,6 +39,7 @@ export function Header() {
         </nav>
         {/* Mobile */}
         <div className="flex items-center gap-3 md:hidden">
+          <SavedLink className="p-2" />
           <ThemeToggle className="p-2" />
           <MobileMenu items={nav} />
         </div>

@@ -91,9 +91,14 @@ create table if not exists public.posts (
 );
 alter table public.posts enable row level security;
 
+-- Scheduled publishing: a published story with publish_at in the future stays
+-- hidden until then. notify_pending = email subscribers when it goes live.
+alter table public.posts add column if not exists publish_at timestamptz;
+alter table public.posts add column if not exists notify_pending boolean not null default false;
+
 drop policy if exists "Anyone can read published posts" on public.posts;
 create policy "Anyone can read published posts" on public.posts
-  for select using (published or public.is_admin());
+  for select using ((published and (publish_at is null or publish_at <= now())) or public.is_admin());
 drop policy if exists "Admins can insert posts" on public.posts;
 create policy "Admins can insert posts" on public.posts
   for insert to authenticated with check (public.is_admin());
@@ -312,6 +317,53 @@ drop policy if exists "Admins can delete areas" on public.areas;
 create policy "Admins can delete areas" on public.areas
   for delete to authenticated using (public.is_admin());
 
+-- ─── Visitor reviews ────────────────────────────────────────────────────
+-- Submitted as "pending"; only approved reviews are visible. Rejected ones are deleted.
+create table if not exists public.reviews (
+  id         uuid primary key default gen_random_uuid(),
+  place_slug text not null references public.places (slug) on update cascade on delete cascade,
+  rating     smallint not null check (rating between 1 and 5),
+  body       text not null default '' check (length(body) <= 1500),
+  name       text not null default '' check (length(name) <= 60),
+  status     text not null default 'pending' check (status in ('pending', 'approved')),
+  created_at timestamptz not null default now()
+);
+create index if not exists reviews_place_idx on public.reviews (place_slug, status);
+alter table public.reviews enable row level security;
+
+-- Visitors submit only through this function: published places only, and at most
+-- 100 reviews an hour site-wide so a bot can't flood the moderation queue.
+create or replace function public.submit_review(p_place text, p_rating int, p_body text, p_name text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (select 1 from public.places where slug = p_place and published) then
+    return false;
+  end if;
+  if (select count(*) from public.reviews where created_at > now() - interval '1 hour') >= 100 then
+    return false;
+  end if;
+  insert into public.reviews (place_slug, rating, body, name)
+  values (p_place, p_rating, trim(coalesce(p_body, '')), trim(coalesce(p_name, '')));
+  return true;
+end;
+$$;
+revoke execute on function public.submit_review(text, int, text, text) from public;
+grant execute on function public.submit_review(text, int, text, text) to anon, authenticated;
+
+drop policy if exists "Anyone can read approved reviews" on public.reviews;
+create policy "Anyone can read approved reviews" on public.reviews
+  for select using (status = 'approved' or public.is_admin());
+drop policy if exists "Admins can update reviews" on public.reviews;
+create policy "Admins can update reviews" on public.reviews
+  for update to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "Admins can delete reviews" on public.reviews;
+create policy "Admins can delete reviews" on public.reviews
+  for delete to authenticated using (public.is_admin());
+
 -- ─── Photo storage ───────────────────────────────────────────────────────
 insert into storage.buckets (id, name, public)
 values ('media', 'media', true)
@@ -323,6 +375,11 @@ set file_size_limit = 5 * 1024 * 1024,
     allowed_mime_types = array['image/webp', 'image/jpeg', 'image/png', 'image/avif']
 where id = 'media';
 
+-- Listing the bucket (for "clean up unused photos" in the admin). Viewing photos
+-- by their URL needs no policy, because the bucket is public.
+drop policy if exists "Admins can list media" on storage.objects;
+create policy "Admins can list media" on storage.objects
+  for select to authenticated using (bucket_id = 'media' and public.is_admin());
 drop policy if exists "Admins can upload media" on storage.objects;
 create policy "Admins can upload media" on storage.objects
   for insert to authenticated with check (bucket_id = 'media' and public.is_admin());

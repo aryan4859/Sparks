@@ -35,6 +35,16 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
+      <LegalSection title="Reviews you write">
+        <ul>
+          <li>Write about your own, recent visit, honestly. No reviews of your own business or its competitors, and no paid reviews.</li>
+          <li>No insults, harassment, hate, spam, ads or other people&apos;s personal details.</li>
+          <li>We check every review before it appears, and we may decline or remove any review at our discretion.</li>
+          <li>By sending a review, you let us publish it on {site.name}, with the name you give (or as &ldquo;A visitor&rdquo;).</li>
+          <li>Reviews are the opinions of their writers, not of {site.name}.</li>
+        </ul>
+      </LegalSection>
+
       <LegalSection title="Our content">
         <ul>
           <li>Unless credited otherwise, the text and photos on {site.name} are ours.</li>

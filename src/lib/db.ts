@@ -38,6 +38,8 @@ export type PostRow = {
   date: string;
   body: string;
   published: boolean;
+  publish_at?: string | null;
+  notify_pending?: boolean;
 };
 
 export function placeFromRow(r: PlaceRow): Place {
@@ -102,7 +104,17 @@ export function placeToRow(p: Place): PlaceRow {
 }
 
 export function postFromRow(r: PostRow): Post {
-  return { ...r };
+  return {
+    slug: r.slug,
+    title: r.title,
+    excerpt: r.excerpt,
+    cover: r.cover,
+    date: r.date,
+    body: r.body,
+    published: r.published,
+    publishAt: r.publish_at ?? undefined,
+    notifyPending: r.notify_pending ?? false,
+  };
 }
 
 export type ListRow = {

@@ -3,7 +3,9 @@
 import { after } from "next/server";
 import { sendConfirmation, sendWelcome } from "@/lib/newsletter";
 import { clientIp, rateLimited } from "@/lib/rate-limit";
+import { getPlacesBySlugs } from "@/lib/queries";
 import { publicClient } from "@/lib/supabase/clients";
+import type { Place } from "@/lib/types";
 import { cleanHttpUrl, coordsFromMapsLink } from "@/lib/validate";
 
 export type SubscribeState = { ok?: boolean; error?: string; email?: string } | undefined;
@@ -114,5 +116,52 @@ export async function suggestPlace(_: SuggestState, formData: FormData): Promise
     return fail("Something went wrong — please try again.");
   }
   if (!accepted) return fail("We're getting a lot of suggestions right now — please try again later.");
+  return { ok: true };
+}
+
+// ─── Saved places ────────────────────────────────────────────────────────
+
+/** The published places among the slugs saved on this device, in the same order. */
+export async function loadSavedPlaces(slugs: unknown): Promise<Place[]> {
+  if (!Array.isArray(slugs)) return [];
+  const valid = slugs.filter((s): s is string => typeof s === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(s)).slice(0, 200);
+  return getPlacesBySlugs(valid);
+}
+
+// ─── Reviews ─────────────────────────────────────────────────────────────
+
+export type ReviewState =
+  | { ok?: boolean; error?: string; values?: { rating: string; body: string; name: string } }
+  | undefined;
+
+export async function submitReview(_: ReviewState, formData: FormData): Promise<ReviewState> {
+  if (formData.get("website")) return { ok: true }; // honeypot
+
+  const place = String(formData.get("place") ?? "");
+  const rating = Number(formData.get("rating"));
+  const body = clean(formData.get("body"), true);
+  const name = clean(formData.get("name"));
+  const values = { rating: String(formData.get("rating") ?? ""), body, name };
+  const fail = (error: string): ReviewState => ({ error, values });
+
+  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(place)) return fail("Couldn't read the form — please reload and try again.");
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return fail("Pick a rating from 1 to 5 stars.");
+  if (body.length > 1500) return fail("Please keep the review under 1,500 characters.");
+  if (name.length > 60) return fail("That name is too long.");
+  if (rateLimited(`review:${await clientIp()}`, 3, 60 * 60 * 1000)) {
+    return fail("You've sent a few reviews already — please try again in an hour.");
+  }
+
+  const { data: accepted, error } = await publicClient().rpc("submit_review", {
+    p_place: place,
+    p_rating: rating,
+    p_body: body,
+    p_name: name,
+  });
+  if (error) {
+    console.error("submitReview:", error.message);
+    return fail("Something went wrong — please try again.");
+  }
+  if (!accepted) return fail("Reviews can't be added right now — please try again later.");
   return { ok: true };
 }

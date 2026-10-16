@@ -1,10 +1,13 @@
 "use client";
 
+import { fromNepalInput, toNepalInput } from "@/lib/hours";
 import { slugify } from "@/lib/validate";
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { deletePost, savePost } from "@/app/admin/actions";
 import type { Post } from "@/lib/types";
 import { ImageUpload, uploadImage } from "./ImageUpload";
+import { StoryPreview } from "./StoryPreview";
+import { useStoryDraft } from "./useStoryDraft";
 import { type Newsletter, NewsletterOption } from "./NewsletterOption";
 import { DeleteButton, ErrorNote, Field, GhostButton, inputClass, Panel, SubmitButton, UploadsProvider, useUploads } from "./ui";
 import { OFFLINE, withNetworkError } from "@/lib/safe-action";
@@ -36,10 +39,26 @@ function PostFormFields({
   const [uploading, setUploading] = useState(false);
   const { track } = useUploads();
   // Default on for stories that haven't been published yet; opt-in for older ones.
-  const [notify, setNotify] = useState(initial.published === false || isNew);
+  const [notify, setNotify] = useState(initial.published === false || isNew || !!initial.notifyPending);
+  // "Go live at", in Nepal time; empty = publish as soon as it's saved.
+  const [schedule, setSchedule] = useState(initial.publishAt ? toNepalInput(initial.publishAt) : "");
+  const scheduledFor = fromNepalInput(schedule);
+  const [openedAt] = useState(() => Date.now()); // "now" for this editing session
+  const isScheduled = post.published !== false && !!scheduledFor && scheduledFor.getTime() > openedAt;
   const [state, action] = useActionState(savePostAction, undefined);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [tab, setTab] = useState<"edit" | "preview">("edit");
+  const draft = useStoryDraft(initial.slug, post, initial);
+
+  const postRef = useRef(post);
+  useEffect(() => {
+    postRef.current = post;
+  }, [post]);
+  // If saving failed, keep the edits safe in this browser again.
+  useEffect(() => {
+    if (state?.error) draft.failed(postRef.current);
+  }, [state, draft]);
 
   const set = <K extends keyof Post>(key: K, value: Post[K]) => setPost((p) => ({ ...p, [key]: value }));
 
@@ -58,6 +77,25 @@ function PostFormFields({
     });
   }
 
+  /** Wrap the selected text (or a placeholder) for **bold**, *italic* or a [link](url). */
+  function wrap(before: string, after: string, placeholder: string) {
+    const el = bodyRef.current;
+    const start = el?.selectionStart ?? post.body.length;
+    const end = el?.selectionEnd ?? start;
+    const selected = post.body.slice(start, end) || placeholder;
+    set("body", post.body.slice(0, start) + before + selected + after + post.body.slice(end));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + before.length, start + before.length + selected.length);
+    });
+  }
+
+  function addLink() {
+    const url = window.prompt("Link to (a web address, or a page on Sparks like /places/yala-garden-cafe-and-restro):", "https://");
+    if (!url || url === "https://") return;
+    wrap("[", `](${url.trim()})`, "link text");
+  }
+
   async function insertImage(file?: File) {
     if (!file || uploading) return;
     setUploading(true);
@@ -73,7 +111,26 @@ function PostFormFields({
   }
 
   return (
-    <form action={action} className="space-y-6">
+    <form action={action} onSubmit={draft.submitted} className="space-y-6">
+      {draft.offer && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border border-ink bg-paper px-4 py-3 text-sm">
+          <span>
+            You have unsaved changes from {new Date(draft.offer.savedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}.
+          </span>
+          <span className="flex gap-2">
+            <GhostButton
+              onClick={() => {
+                const saved = draft.offer!;
+                setPost((p) => ({ ...p, title: saved.title, excerpt: saved.excerpt, body: saved.body, cover: saved.cover }));
+                draft.dismiss();
+              }}
+            >
+              Restore them
+            </GhostButton>
+            <GhostButton onClick={draft.discard}>Discard</GhostButton>
+          </span>
+        </div>
+      )}
       <input type="hidden" name="isNew" value={isNew ? "1" : "0"} />
       <input type="hidden" name="cover" value={post.cover} />
       <input type="hidden" name="slug" value={post.slug} />
@@ -117,6 +174,27 @@ function PostFormFields({
                 Published
               </label>
             </div>
+            {post.published !== false && (
+              <Field
+                label="Go live at (Nepal time)"
+                hint={
+                  isScheduled
+                    ? "Scheduled: hidden until then; subscribers are emailed when it goes live (if ticked below)."
+                    : "Optional. Leave empty to publish as soon as you save."
+                }
+              >
+                <div className="flex gap-2">
+                  <input
+                    type="datetime-local"
+                    name="publish_at_local"
+                    value={schedule}
+                    onChange={(e) => setSchedule(e.target.value)}
+                    className={inputClass}
+                  />
+                  {schedule && <GhostButton onClick={() => setSchedule("")}>Clear</GhostButton>}
+                </div>
+              </Field>
+            )}
             <NewsletterOption
               newsletter={newsletter}
               published={post.published !== false}
@@ -132,6 +210,21 @@ function PostFormFields({
 
       <Panel title="Body">
         <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="mr-2 flex border border-line text-xs">
+            {(["edit", "preview"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className={`px-3 py-1.5 capitalize ${tab === t ? "bg-ink text-paper" : "text-muted hover:text-ink"}`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <GhostButton disabled={tab === "preview"} onClick={() => wrap("**", "**", "bold text")} title="Bold" className="font-bold">B</GhostButton>
+          <GhostButton disabled={tab === "preview"} onClick={() => wrap("*", "*", "italic text")} title="Italic" className="italic">I</GhostButton>
+          <GhostButton disabled={tab === "preview"} onClick={addLink} title="Link">Link</GhostButton>
           <GhostButton onClick={() => insertBlock("## Heading")}>+ Heading</GhostButton>
           <GhostButton disabled={uploading} onClick={() => fileRef.current?.click()}>
             {uploading ? "Uploading…" : "+ Photo"}
@@ -148,22 +241,26 @@ function PostFormFields({
             ))}
           </select>
         </div>
+        {tab === "preview" && <StoryPreview post={post} places={places} />}
+        {/* Stays in the form while previewing, so the body is still saved. */}
         <textarea
           ref={bodyRef}
           name="body"
+          hidden={tab === "preview"}
           className={`${inputClass} min-h-[28rem] font-mono text-[13px] leading-relaxed`}
           value={post.body}
           onChange={(e) => set("body", e.target.value)}
         />
         <p className="mt-2 text-xs text-muted">
-          Leave a blank line between paragraphs. <code>## Heading</code> · <code>![Caption](image-url)</code> ·{" "}
-          <code>[[place:slug]]</code> embeds a place card.
+          Leave a blank line between paragraphs. <code>**bold**</code> · <code>*italic*</code> · <code>[text](link)</code> ·{" "}
+          <code>## Heading</code> · <code>![Caption](image-url)</code> · <code>[[place:slug]]</code> embeds a place card. Edits are
+          autosaved in this browser until you save.
         </p>
       </Panel>
 
       <div className="sticky bottom-0 -mx-4 flex items-center justify-between gap-4 border-t border-line bg-surface/95 px-4 py-4 backdrop-blur sm:mx-0 sm:px-0">
         <div className="flex gap-3">
-          <SubmitButton>{isNew ? "Publish story" : "Save changes"}</SubmitButton>
+          <SubmitButton>{isScheduled ? "Schedule story" : isNew ? "Publish story" : "Save changes"}</SubmitButton>
           {!isNew && (
             <a href={`/journal/${post.slug}`} target="_blank" className="self-center text-sm text-muted underline hover:text-ink">
               View ↗

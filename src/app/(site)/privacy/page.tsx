@@ -33,12 +33,17 @@ export default function PrivacyPage() {
           you don&apos;t confirm, your address is deleted after 30 days and you get nothing else from us.
         </p>
         <p>
-          <strong>Settings on your device:</strong> your browser remembers whether you chose the light or dark theme, and whether
-          you&apos;ve already seen the intro animation in this visit. These stay on your own device and are never sent to us.
+          <strong>Settings on your device:</strong> your browser remembers whether you chose the light or dark theme, whether
+          you&apos;ve already seen the intro animation in this visit, and the places you save with ♡. These stay on your own device and are never sent to us.
         </p>
         <p>
           <strong>If you suggest a place:</strong> only what you type into the form (the place&apos;s name, area, map link and
           your note). We don&apos;t ask who you are.
+        </p>
+        <p>
+          <strong>If you write a review:</strong> your star rating, your text and the name you choose to give (if any). Once we
+          approve it, it&apos;s shown publicly on the place&apos;s page. We don&apos;t ask for your email. To have a review removed,
+          email us with the place and what you wrote.
         </p>
         <p>
           <strong>If you tap &ldquo;Near me&rdquo;:</strong> your browser asks your permission, then shares your approximate location

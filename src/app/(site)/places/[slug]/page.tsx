@@ -4,12 +4,15 @@ import Link from "next/link";
 import { JsonLd, placeJsonLd } from "@/components/JsonLd";
 import { OpenStatus } from "@/components/OpenStatus";
 import { slugify } from "@/lib/validate";
+import { Reviews } from "@/components/Reviews";
+import { SaveButton } from "@/components/SaveButton";
+import { Stars } from "@/components/Stars";
 import { ShareButtons } from "@/components/ShareButtons";
 import { notFound } from "next/navigation";
 import { PlacesMap } from "@/components/map/PlacesMap";
 import { PlaceCard } from "@/components/PlaceCard";
 import { budgetHint, budgetLabel, categories, directionsUrl, features, formatPrice, isFeature, siteUrl } from "@/lib/site";
-import { getAllPlaceSlugs, getNearby, getPlace } from "@/lib/queries";
+import { getAllPlaceSlugs, getNearby, getPlace, getReviews } from "@/lib/queries";
 
 export async function generateStaticParams() {
   return (await getAllPlaceSlugs()).map((slug) => ({ slug }));
@@ -31,14 +34,14 @@ export default async function PlacePage({ params }: PageProps<"/places/[slug]">)
   const place = await getPlace((await params).slug);
   if (!place) notFound();
 
-  const nearby = await getNearby(place);
+  const [nearby, { reviews, average }] = await Promise.all([getNearby(place), getReviews(place.slug)]);
   const cat = categories[place.category];
   const signatureTitle =
     place.category === "cafe" ? "Signature drinks" : place.category === "restaurant" ? "Signature dishes" : "What to buy";
 
   return (
     <article>
-      <JsonLd data={placeJsonLd(place)} />
+      <JsonLd data={placeJsonLd(place, reviews)} />
       {/* Hero */}
       <div className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14">
         <nav className="label text-muted">
@@ -52,6 +55,12 @@ export default async function PlacePage({ params }: PageProps<"/places/[slug]">)
         </nav>
         <h1 className="mt-4 max-w-4xl text-4xl font-semibold tracking-tight sm:text-7xl">{place.name}</h1>
         <p className="mt-4 max-w-2xl font-serif text-2xl italic text-muted sm:text-3xl">{place.tagline}</p>
+        {reviews.length > 0 && (
+          <a href="#reviews" className="mt-4 inline-block text-sm hover:underline">
+            <Stars rating={average} /> <span className="font-medium">{average.toFixed(1)}</span>
+            <span className="text-muted"> · {reviews.length} {reviews.length === 1 ? "review" : "reviews"}</span>
+          </a>
+        )}
       </div>
 
       {/* Phones: swipeable strip of every photo */}
@@ -177,6 +186,8 @@ export default async function PlacePage({ params }: PageProps<"/places/[slug]">)
               <p className="mt-6 text-xs text-muted">Prices last checked when this listing was updated and may change.</p>
             </section>
           )}
+
+          <Reviews place={place.slug} reviews={reviews} average={average} />
         </div>
 
         {/* Info sidebar */}
@@ -225,7 +236,8 @@ export default async function PlacePage({ params }: PageProps<"/places/[slug]">)
               </a>
             )}
           </div>
-          <div className="mt-6">
+          <div className="mt-6 space-y-4">
+            <SaveButton slug={place.slug} name={place.name} variant="page" />
             <ShareButtons url={`${siteUrl}/places/${place.slug}`} title={place.name} />
           </div>
         </aside>

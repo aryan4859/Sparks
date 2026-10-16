@@ -2,8 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { type ListRow, placeFromRow, type PlaceRow, type PostRow } from "@/lib/db";
 import { getAreas } from "@/lib/queries";
-import { dismissSuggestion, eraseSubscriber } from "@/app/admin/actions";
-import { DeleteButton } from "@/components/admin/ui";
+import { approveReview, cleanUpPhotos, deleteReview, dismissSuggestion, eraseSubscriber } from "@/app/admin/actions";
+import { formatNepalTime } from "@/lib/hours";
+import { findUnusedMedia } from "@/lib/media";
+import { ActionButton, DeleteButton } from "@/components/admin/ui";
+import { Stars } from "@/components/Stars";
 import { newsletterReady } from "@/lib/newsletter";
 import { categories, firstParam, formatDate } from "@/lib/site";
 import { dbError } from "@/lib/supabase/errors";
@@ -30,6 +33,8 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
   if (tab === "subscribers") return <SubscriberList />;
   if (tab === "suggestions") return <SuggestionList />;
   if (tab === "lists") return <ListsList />;
+  if (tab === "reviews") return <ReviewList />;
+  if (tab === "photos") return <PhotoStorage />;
   if (tab === "areas") return <AreasList />;
   return <PlacesList sp={sp} />;
 }
@@ -184,7 +189,7 @@ async function JournalList() {
   const supabase = await sessionClient();
   const res = await supabase
     .from("posts")
-    .select("slug, title, cover, date, published")
+    .select("slug, title, cover, date, published, publish_at")
     .order("date", { ascending: false })
     .returns<PostRow[]>();
   if (res.error) throw dbError(res.error);
@@ -215,6 +220,9 @@ async function JournalList() {
                   <p className="truncate font-medium">
                     {p.title}
                     {!p.published && <span className="label ml-2 text-warn">Draft</span>}
+                    {p.published && p.publish_at && new Date(p.publish_at) > new Date() && (
+                      <span className="label ml-2 text-warn">Scheduled · {formatNepalTime(p.publish_at)}</span>
+                    )}
                   </p>
                   <p className="text-xs text-muted">{formatDate(p.date)}</p>
                 </div>
@@ -411,6 +419,112 @@ async function AreasList() {
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+type AdminReview = {
+  id: string;
+  place_slug: string;
+  rating: number;
+  body: string;
+  name: string;
+  status: "pending" | "approved";
+  created_at: string;
+  places: { name: string } | null;
+};
+
+async function ReviewList() {
+  const supabase = await sessionClient();
+  const res = await supabase
+    .from("reviews")
+    .select("*, places(name)")
+    .order("status", { ascending: false }) // "pending" before "approved"
+    .order("created_at", { ascending: false })
+    .limit(300)
+    .returns<AdminReview[]>();
+  if (res.error) throw dbError(res.error);
+  const pending = res.data.filter((r) => r.status === "pending").length;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight">Reviews</h1>
+        <p className="mt-1 text-sm text-muted">
+          {pending} waiting for approval. Only approved reviews appear on the site; delete anything abusive, off-topic or fake.
+        </p>
+      </div>
+      {res.data.length === 0 ? (
+        <p className="border border-dashed border-line p-6 text-sm text-muted">No reviews yet. Visitors can write one on any place page.</p>
+      ) : (
+        <ul className="divide-y divide-line border-y border-line">
+          {res.data.map((r) => (
+            <li key={r.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <p className="text-sm">
+                  <Stars rating={r.rating} /> <span className="font-medium">{r.name || "A visitor"}</span> on{" "}
+                  <Link href={`/places/${r.place_slug}#reviews`} target="_blank" className="underline">{r.places?.name ?? r.place_slug}</Link>
+                  {r.status === "pending" && <span className="label ml-2 text-warn">Waiting</span>}
+                </p>
+                {r.body && <p className="whitespace-pre-line text-sm">{r.body}</p>}
+                <p className="text-xs text-muted">{formatDate(r.created_at)}</p>
+              </div>
+              <div className="flex shrink-0 items-start gap-4">
+                {r.status === "pending" && <ActionButton action={approveReview.bind(null, r.id)} label="Approve" pendingLabel="Approving…" />}
+                <DeleteButton confirmText="Delete this review? This can't be undone." action={deleteReview.bind(null, r.id)} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+
+async function PhotoStorage() {
+  const { totalCount, totalBytes, unused, unusedBytes } = await findUnusedMedia(await sessionClient());
+  const LIMIT = 1024 * 1024 * 1024; // Supabase free plan: 1 GB of storage
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight">Photos</h1>
+        <p className="mt-1 text-sm text-muted">
+          {totalCount.toLocaleString()} photos · {mb(totalBytes)} of the free 1 GB ({((totalBytes / LIMIT) * 100).toFixed(1)}%)
+        </p>
+      </div>
+      <div className="h-2 w-full max-w-md bg-card">
+        <div className="h-2 bg-ink" style={{ width: `${Math.min(100, (totalBytes / LIMIT) * 100)}%` }} />
+      </div>
+      {unused.length === 0 ? (
+        <p className="border border-dashed border-line p-6 text-sm text-muted">
+          Nothing to clean up: every photo older than a day is in use somewhere.
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-4 border border-line bg-paper p-4">
+            <p className="text-sm">
+              <strong>{unused.length.toLocaleString()} unused photos</strong> ({mb(unusedBytes)}): replaced covers, removed gallery
+              photos, or from deleted places. Photos uploaded in the last 24 hours are never included.
+            </p>
+            <DeleteButton
+              confirmText={`Permanently delete ${unused.length} unused photos? Nothing on the site uses them.`}
+              action={cleanUpPhotos}
+              label={`Delete ${unused.length} unused photos`}
+              pendingLabel="Deleting…"
+            />
+          </div>
+          <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-8">
+            {unused.slice(0, 48).map((f) => (
+              <li key={f.path} title={`${f.path} · ${mb(f.size)}`} className="relative aspect-square overflow-hidden bg-card">
+                <Image src={f.url} alt="" fill sizes="120px" className="object-cover" />
+              </li>
+            ))}
+          </ul>
+          {unused.length > 48 && <p className="text-xs text-muted">…and {unused.length - 48} more.</p>}
+        </>
       )}
     </div>
   );

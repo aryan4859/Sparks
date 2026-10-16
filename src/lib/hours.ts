@@ -187,3 +187,38 @@ export function formatSchedule(schedule: Schedule): string {
     .map((g) => `${g.from === g.to ? DAY_LABELS[g.from] : `${DAY_LABELS[g.from]}–${DAY_LABELS[g.to]}`} ${g.text}`)
     .join(" · ");
 }
+
+/** "2026-10-20T08:00" (Nepal time, as typed in a date-time field) for an ISO time. */
+export function toNepalInput(iso: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kathmandu",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
+/** The moment for a Nepal-time "2026-10-20T08:00" (Nepal is UTC+5:45 all year, no daylight saving). */
+export function fromNepalInput(local: string) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(local)) return null;
+  const date = new Date(`${local}:00+05:45`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** "20 Oct 2026, 8:00am" in Nepal time. */
+export function formatNepalTime(iso: string) {
+  return new Date(iso).toLocaleString("en-GB", {
+    timeZone: "Asia/Kathmandu",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}

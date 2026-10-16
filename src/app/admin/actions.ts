@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { type ListRow, placeToRow, type PostRow } from "@/lib/db";
+import { fromNepalInput } from "@/lib/hours";
 import { parsePostBody } from "@/lib/markdown";
+import { deleteUnusedMedia } from "@/lib/media";
 import { newsletterReady, sendNewPlace, sendNewPost } from "@/lib/newsletter";
 import { isFeature, safeAdminPath } from "@/lib/site";
 import { currentAdmin, sessionClient } from "@/lib/supabase/server";
@@ -237,6 +239,16 @@ export async function savePost(_: FormState, formData: FormData): Promise<FormSt
     published: formData.get("published") === "on",
   };
 
+  // "Go live at" (Nepal time). In the future = scheduled: hidden until then.
+  const scheduleInput = String(formData.get("publish_at_local") ?? "").trim();
+  const publishAt = scheduleInput ? fromNepalInput(scheduleInput) : null;
+  if (scheduleInput && !publishAt) return { error: "That go-live time doesn't look right — pick it again." };
+  row.publish_at = row.published && publishAt ? publishAt.toISOString() : null;
+  const scheduled = !!publishAt && row.published && publishAt.getTime() > Date.now();
+  const notify = row.published && formData.get("notify") === "on";
+  // Scheduled stories are emailed when they go live (see /api/cron/publish), not now.
+  row.notify_pending = scheduled && notify;
+
   if (!row.title) return { error: "Title is required." };
   if (!SLUG.test(row.slug)) return { error: "Slug may only contain lowercase letters, numbers and single hyphens." };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date)) return { error: "Pick a date for the story." };
@@ -265,7 +277,7 @@ export async function savePost(_: FormState, formData: FormData): Promise<FormSt
   if (!data?.length) return { error: `This story couldn't be saved. ${GONE}` };
   refreshSite();
 
-  if (row.published && formData.get("notify") === "on") {
+  if (notify && !scheduled) {
     await emailSubscribersOnce(supabase, "posts", row.slug, `“${row.title}”`, () => sendNewPost(supabase, row));
   }
   redirect("/admin?tab=journal");
@@ -367,4 +379,34 @@ export async function saveArea(_: FormState, formData: FormData): Promise<FormSt
   if (error) return { error: error.message };
   refreshSite();
   redirect("/admin?tab=areas");
+}
+
+// ─── Reviews ─────────────────────────────────────────────────────────────
+
+export async function approveReview(id: string): Promise<FormState> {
+  const supabase = await requireAdmin();
+  const { data, error } = await supabase.from("reviews").update({ status: "approved" }).eq("id", id).select("id");
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: `Nothing was approved. ${GONE}` };
+  refreshSite();
+  return undefined;
+}
+
+export async function deleteReview(id: string): Promise<FormState> {
+  const supabase = await requireAdmin();
+  const { data, error } = await supabase.from("reviews").delete().eq("id", id).select("id");
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: `Nothing was deleted. ${GONE}` };
+  refreshSite();
+  return undefined;
+}
+
+// ─── Storage ─────────────────────────────────────────────────────────────
+
+export async function cleanUpPhotos(): Promise<FormState> {
+  const supabase = await requireAdmin();
+  const { deleted, error } = await deleteUnusedMedia(supabase);
+  revalidatePath("/admin");
+  if (error) return { error: `Stopped after deleting ${deleted} photos: ${error}` };
+  return undefined;
 }

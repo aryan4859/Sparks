@@ -23,6 +23,7 @@ export function Footer() {
             ))}
             <li><Link href="/explore" className="hover:underline">Map</Link></li>
             <li><Link href="/lists" className="hover:underline">Lists</Link></li>
+            <li><Link href="/saved" className="hover:underline">Saved places</Link></li>
           </ul>
         </div>
         <div>
