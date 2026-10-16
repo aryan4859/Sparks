@@ -3,11 +3,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { JsonLd, placeJsonLd } from "@/components/JsonLd";
 import { OpenStatus } from "@/components/OpenStatus";
+import { slugify } from "@/lib/validate";
 import { ShareButtons } from "@/components/ShareButtons";
 import { notFound } from "next/navigation";
 import { PlacesMap } from "@/components/map/PlacesMap";
 import { PlaceCard } from "@/components/PlaceCard";
-import { budgetHint, budgetLabel, categories, directionsUrl, formatPrice, siteUrl } from "@/lib/site";
+import { budgetHint, budgetLabel, categories, directionsUrl, features, formatPrice, isFeature, siteUrl } from "@/lib/site";
 import { getAllPlaceSlugs, getNearby, getPlace } from "@/lib/queries";
 
 export async function generateStaticParams() {
@@ -43,7 +44,11 @@ export default async function PlacePage({ params }: PageProps<"/places/[slug]">)
         <nav className="label text-muted">
           <Link href={cat.href} className="hover:text-ink">{cat.plural}</Link>
           <span className="mx-2">/</span>
-          <span>{place.neighborhood}</span>
+          {place.neighborhood && slugify(place.neighborhood) ? (
+            <Link href={`/areas/${slugify(place.neighborhood)}`} className="hover:text-ink">{place.neighborhood}</Link>
+          ) : (
+            <span>{place.neighborhood}</span>
+          )}
         </nav>
         <h1 className="mt-4 max-w-4xl text-4xl font-semibold tracking-tight sm:text-7xl">{place.name}</h1>
         <p className="mt-4 max-w-2xl font-serif text-2xl italic text-muted sm:text-3xl">{place.tagline}</p>
@@ -102,6 +107,19 @@ export default async function PlacePage({ params }: PageProps<"/places/[slug]">)
         <div className="max-w-2xl">
           <p className="label text-muted">Our take</p>
           <p className="mt-4 text-lg leading-relaxed sm:text-xl">{place.review}</p>
+
+          {place.features.length > 0 && (
+            <ul className="mt-8 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+              {place.features.filter(isFeature).map((f) => (
+                <li key={f}>
+                  <Link href={`${cat.href}?feature=${f}`} className="hover:underline">
+                    <span aria-hidden className="mr-1.5 text-muted">✓</span>
+                    {features[f]}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
 
           {place.ambience.length > 0 && (
             <div className="mt-8 flex flex-wrap gap-1.5">

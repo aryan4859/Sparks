@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { deletePlace, savePlace } from "@/app/admin/actions";
-import { budgetHint, budgetLabel } from "@/lib/site";
+import { budgetHint, budgetLabel, type Feature, features } from "@/lib/site";
 import type { Budget, Category, MenuItem, MenuSection, Place } from "@/lib/types";
 import { formatSchedule, parseHours } from "@/lib/hours";
 import { coordsFromMapsLink, slugify } from "@/lib/validate";
@@ -165,6 +165,23 @@ function PlaceFormFields({
               <option value="pure-veg">Pure vegetarian</option>
             </select>
           </Field>
+          <fieldset className="sm:col-span-2">
+            <legend className="label text-muted">Good to know</legend>
+            <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+              {(Object.keys(features) as Feature[]).map((key) => (
+                <label key={key} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={place.features.includes(key)}
+                    onChange={(e) =>
+                      set("features", e.target.checked ? [...place.features, key] : place.features.filter((f) => f !== key))
+                    }
+                  />
+                  {features[key]}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <Field
             label="Ambience"
             className="sm:col-span-2"

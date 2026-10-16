@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { budgetHint, budgetLabel } from "@/lib/site";
+import { budgetHint, budgetLabel, type Feature, features } from "@/lib/site";
 import type { PlaceFilters } from "@/lib/queries";
 import type { Budget } from "@/lib/types";
 import { NearMeChip } from "./NearMeChip";
 
-type Facets = { areas: string[]; types: string[]; ambience: string[] };
+type Facets = { areas: string[]; types: string[]; ambience: string[]; features: string[] };
 
-type Params = Partial<Record<"q" | "area" | "type" | "budget" | "ambience" | "veg" | "category" | "open" | "near", string>>;
+type Params = Partial<Record<"q" | "area" | "type" | "budget" | "ambience" | "veg" | "category" | "open" | "near" | "feature", string>>;
 
 function toParams(f: PlaceFilters, includeCategory: boolean): Params {
   return {
@@ -17,6 +17,7 @@ function toParams(f: PlaceFilters, includeCategory: boolean): Params {
     ambience: f.ambience,
     veg: f.veg ? "1" : undefined,
     category: includeCategory ? f.category : undefined,
+    feature: f.feature,
     open: f.open ? "1" : undefined,
     near: f.near ? `${f.near.lat},${f.near.lng}` : undefined,
   };
@@ -89,6 +90,11 @@ export function Filters({
     },
     { label: "Ambience", key: "ambience", options: facets.ambience.map((a) => ({ value: a, text: a })) },
   );
+  // Only attributes that at least one place has, in the order of the list in site.ts.
+  const featureOptions = (Object.keys(features) as Feature[]).filter((k) => facets.features.includes(k));
+  if (featureOptions.length) {
+    rows.push({ label: "Good for", key: "feature", options: featureOptions.map((k) => ({ value: k, text: features[k] })) });
+  }
 
   const hasAny = Object.entries(current).some(([k, v]) => v && !(k === "category" && !showCategory));
 

@@ -3,12 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { placeToRow, type PostRow } from "@/lib/db";
+import { type ListRow, placeToRow, type PostRow } from "@/lib/db";
 import { parsePostBody } from "@/lib/markdown";
 import { newsletterReady, sendNewPlace, sendNewPost } from "@/lib/newsletter";
-import { safeAdminPath } from "@/lib/site";
+import { isFeature, safeAdminPath } from "@/lib/site";
 import { currentAdmin, sessionClient } from "@/lib/supabase/server";
-import type { MenuItem, Place } from "@/lib/types";
+import type { Area, CuratedList, MenuItem, Place } from "@/lib/types";
 import { cleanHttpUrl, isAllowedImage } from "@/lib/validate";
 
 export type FormState = { error?: string } | undefined;
@@ -163,6 +163,7 @@ export async function savePlace(_: FormState, formData: FormData): Promise<FormS
   place.tagline = text(place.tagline, 200);
   place.review = text(place.review, 10000);
   place.hours = text(place.hours, 300) || undefined;
+  place.features = [...new Set((Array.isArray(place.features) ? place.features : []).filter(isFeature))];
   place.ambience = [...new Set((Array.isArray(place.ambience) ? place.ambience : []).map((a) => text(a, 40)).filter(Boolean))].slice(0, 20);
   place.gallery = place.gallery.filter((g): g is string => typeof g === "string" && g !== "").slice(0, 30);
   if (place.location) {
@@ -300,4 +301,70 @@ export async function eraseSubscriber(email: string): Promise<FormState> {
   if (!data?.length) return { error: `Nothing was erased. ${GONE}` };
   revalidatePath("/admin");
   return undefined;
+}
+
+// ─── Curated lists ───────────────────────────────────────────────────────
+
+export async function saveList(_: FormState, formData: FormData): Promise<FormState> {
+  const supabase = await requireAdmin();
+  const isNew = formData.get("isNew") === "1";
+
+  let list: CuratedList;
+  try {
+    list = JSON.parse(String(formData.get("payload")));
+  } catch {
+    return { error: "Couldn't read the form — please try again." };
+  }
+  const row: ListRow = {
+    slug: text(list.slug, 80),
+    title: text(list.title, 120),
+    intro: text(list.intro, 2000),
+    cover: text(list.cover, 600),
+    places: [...new Set((Array.isArray(list.places) ? list.places : []).filter((s): s is string => typeof s === "string" && SLUG.test(s)))].slice(0, 100),
+    published: list.published === true,
+  };
+  if (!row.title) return { error: "Give the list a title." };
+  if (!SLUG.test(row.slug)) return { error: "Slug may only contain lowercase letters, numbers and single hyphens." };
+  if (row.cover && !isAllowedImage(row.cover)) return { error: "The cover must be a photo uploaded here." };
+  if (row.published && row.places.length === 0) return { error: "Add at least one place before publishing the list." };
+
+  const originalSlug = String(formData.get("originalSlug") || row.slug);
+  const { data, error } = isNew
+    ? await supabase.from("lists").insert(row).select("slug")
+    : await supabase
+        .from("lists")
+        .update({ ...row, updated_at: new Date().toISOString() })
+        .eq("slug", originalSlug)
+        .select("slug");
+  if (error) return { error: error.code === "23505" ? "A list with this slug already exists." : error.message };
+  if (!data?.length) return { error: `This list couldn't be saved. ${GONE}` };
+  refreshSite();
+  redirect("/admin?tab=lists");
+}
+
+export async function deleteList(slug: string): Promise<FormState> {
+  const supabase = await requireAdmin();
+  const { data, error } = await supabase.from("lists").delete().eq("slug", slug).select("slug");
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: `Nothing was deleted. ${GONE}` };
+  refreshSite();
+  redirect("/admin?tab=lists");
+}
+
+// ─── Neighbourhood guides ────────────────────────────────────────────────
+
+export async function saveArea(_: FormState, formData: FormData): Promise<FormState> {
+  const supabase = await requireAdmin();
+  const area: Area = {
+    slug: text(formData.get("slug"), 80),
+    name: text(formData.get("name"), 80),
+    intro: text(formData.get("intro"), 3000),
+    cover: text(formData.get("cover"), 600),
+  };
+  if (!SLUG.test(area.slug) || !area.name) return { error: "Couldn't read the form — please try again." };
+  if (area.cover && !isAllowedImage(area.cover)) return { error: "The cover must be a photo uploaded here." };
+  const { error } = await supabase.from("areas").upsert({ ...area, updated_at: new Date().toISOString() });
+  if (error) return { error: error.message };
+  refreshSite();
+  redirect("/admin?tab=areas");
 }

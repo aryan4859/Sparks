@@ -27,6 +27,8 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
             <nav className="flex min-w-0 gap-4 overflow-x-auto whitespace-nowrap text-sm text-muted [scrollbar-width:none]">
               <Link href="/admin" className="hover:text-ink">Places</Link>
               <Link href="/admin?tab=journal" className="hover:text-ink">Journal</Link>
+              <Link href="/admin?tab=lists" className="hover:text-ink">Lists</Link>
+              <Link href="/admin?tab=areas" className="hover:text-ink">Areas</Link>
               <Link href="/admin?tab=subscribers" className="hover:text-ink">Subscribers</Link>
               <Link href="/admin?tab=suggestions" className="hover:text-ink">
                 Suggestions{newSuggestions ? <span className="ml-1 bg-ink px-1.5 text-xs text-paper">{newSuggestions}</span> : null}

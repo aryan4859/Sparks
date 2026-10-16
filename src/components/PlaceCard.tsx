@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { budgetLabel, categories } from "@/lib/site";
 import type { Place } from "@/lib/types";
+import { OpenBadge } from "./OpenBadge";
 
 export function PlaceCard({ place, priority }: { place: Place & { km?: number }; priority?: boolean }) {
   return (
@@ -15,6 +16,7 @@ export function PlaceCard({ place, priority }: { place: Place & { km?: number };
           sizes="(min-width: 1024px) 25vw, 50vw"
           className="object-cover transition duration-700 group-hover:scale-[1.03]"
         />
+        <OpenBadge hours={place.hours} className="absolute left-2 top-2" />
       </div>
       <div className="mt-2.5 flex items-baseline justify-between gap-2 sm:mt-3 sm:gap-3">
         <h3 className="min-w-0 text-sm font-medium leading-snug tracking-tight sm:text-base">{place.name}</h3>

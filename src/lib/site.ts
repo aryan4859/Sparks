@@ -28,6 +28,25 @@ export const categories: Record<Category, { label: string; plural: string; href:
   shop: { label: "Shop", plural: "Shops", href: "/shops" },
 };
 
+/**
+ * Practical attributes ticked in the admin, shown on place pages and used as
+ * filters. To add one, add a key here; nothing else needs to change.
+ */
+export const features = {
+  wifi: "Wi-Fi",
+  laptop: "Laptop-friendly",
+  power: "Power outlets",
+  outdoor: "Outdoor seating",
+  garden: "Garden",
+  rooftop: "Rooftop",
+  parking: "Parking",
+  family: "Family-friendly",
+  pets: "Pet-friendly",
+  wheelchair: "Wheelchair accessible",
+} as const;
+export type Feature = keyof typeof features;
+export const isFeature = (v: unknown): v is Feature => typeof v === "string" && v in features;
+
 export const budgetLabel: Record<Budget, string> = {
   1: "Rs",
   2: "Rs Rs",

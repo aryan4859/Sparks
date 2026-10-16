@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect } from "react";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import { openStatus, parseHours } from "@/lib/hours";
 import { directionsUrl } from "@/lib/site";
 
 export type MapPin = {
@@ -12,6 +13,7 @@ export type MapPin = {
   label: string;
   lat: number;
   lng: number;
+  hours?: string;
 };
 
 const pinIcon = L.divIcon({ className: "", html: '<div class="map-pin"></div>', iconSize: [14, 14] });
@@ -43,22 +45,27 @@ export default function LeafletMap({ pins }: { pins: MapPin[] }) {
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <FitBounds pins={pins} />
-      {pins.map((p) => (
-        <Marker key={p.slug} position={[p.lat, p.lng]} icon={pinIcon}>
-          <Popup>
-            <a href={`/places/${p.slug}`} className="block font-medium text-ink">{p.name}</a>
-            <span className="label text-muted">{p.label}</span>
-            <a
-              href={directionsUrl(p.lat, p.lng)}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 block text-xs underline"
-            >
-              Directions ↗
-            </a>
-          </Popup>
-        </Marker>
-      ))}
+      {pins.map((p) => {
+        // The map only renders in the browser, so "now" is the visitor's current time.
+        const status = openStatus(parseHours(p.hours));
+        return (
+          <Marker key={p.slug} position={[p.lat, p.lng]} icon={pinIcon}>
+            <Popup>
+              <a href={`/places/${p.slug}`} className="block font-medium text-ink">{p.name}</a>
+              <span className="label text-muted">{p.label}</span>
+              {status && <span className="mt-1 block text-xs">{status.text}</span>}
+              <a
+                href={directionsUrl(p.lat, p.lng)}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 block text-xs underline"
+              >
+                Directions ↗
+              </a>
+            </Popup>
+          </Marker>
+        );
+      })}
     </MapContainer>
   );
 }

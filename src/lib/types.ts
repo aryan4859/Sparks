@@ -24,6 +24,8 @@ export type Place = {
   city: string;
   budget: Budget;
   ambience: string[];
+  /** Keys of `features` in src/lib/site.ts (Wi-Fi, parking, …) */
+  features: string[];
   tagline: string;
   /** Our take — the editorial review */
   review: string;
@@ -42,6 +44,21 @@ export type Place = {
   published?: boolean;
   addedAt: string;
 };
+
+/** A curated list: places in a chosen order ("Best momo in Patan"). */
+export type CuratedList = {
+  slug: string;
+  title: string;
+  intro: string;
+  cover: string;
+  /** Place slugs, in the order shown */
+  places: string[];
+  published: boolean;
+  updatedAt?: string;
+};
+
+/** Optional editorial content for a neighbourhood page. */
+export type Area = { slug: string; name: string; intro: string; cover: string };
 
 export type PostBlock =
   | { type: "p"; text: string }

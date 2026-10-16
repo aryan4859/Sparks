@@ -25,6 +25,29 @@ _Last updated: 16 October 2026_
 
 ---
 
+## v2 roadmap (started 16 October 2026)
+
+v1 (site, admin, newsletter with confirmation, suggestions, SEO, Open now / Near me, share buttons, pre-launch audit) is complete and live.
+
+### Phase 1 — Discovery & content: **built, waiting for the schema re-run and testing**
+- [x] **Attributes** ("Good to know"): Wi-Fi, laptop-friendly, power outlets, outdoor seating, garden, rooftop, parking, family-friendly, pet-friendly, wheelchair accessible. Checkboxes in the place editor, a ✓ list on place pages, a **Good for** filter row (only attributes some place has), and in Google's structured data. Add more in `features` in `src/lib/site.ts`
+- [x] **"Open now" badges** on place cards (worked out in the browser) and opening status in map pins
+- [x] **Curated lists**: admin **Lists** tab → title, intro, cover, pick published places and order them, publish. Public `/lists` and `/lists/[slug]` (numbered places, map, share buttons, Google `ItemList` data), "Lists" in the header and footer, a "Handpicked lists" section on the home page
+- [x] **Neighbourhood guides**: `/areas/[slug]` for every neighbourhood with a published place (places by category, map, share). Optional intro and cover in the admin **Areas** tab. The home page's neighbourhood links and the place page breadcrumb lead there
+- [ ] Re-run `supabase/schema.sql` (adds `places.features`, `lists`, `areas`), then build and test, then push. **Until then the Cafés / Restaurants / Shops pages and the build fail**; Vercel keeps serving the last good version if a build fails
+
+### Phase 2 — Community (next)
+- [ ] **Save places** (♡ on cards and place pages, kept on the visitor's device, a "Saved" page; no account)
+- [ ] **Reviews & ratings**: visitors submit, you approve in the admin before they appear; average rating on place pages and in Google's data
+- Visitor accounts: later, once reviews show demand
+
+### Phase 3 — Admin tools
+- [ ] Bold, italic and links in stories; story preview; autosave drafts
+- [ ] Clean up unused photos in storage (1 GB limit)
+- [ ] Scheduled publishing
+
+---
+
 ## 2. Stack (all free tiers)
 
 | Layer | Choice | Notes |

@@ -53,6 +53,9 @@ create table if not exists public.places (
 );
 create index if not exists places_category_idx on public.places (category);
 
+-- Practical attributes (keys from `features` in src/lib/site.ts: wifi, parking, …).
+alter table public.places add column if not exists features text[] not null default '{}';
+
 -- Places imported from OpenStreetMap keep their OSM id (e.g. "node/123"), so
 -- re-running scripts/import-osm.mjs never duplicates or overwrites them.
 alter table public.places add column if not exists osm_id text unique;
@@ -257,6 +260,56 @@ create policy "Admins can see suggestions" on public.suggestions
   for select to authenticated using (public.is_admin());
 drop policy if exists "Admins can delete suggestions" on public.suggestions;
 create policy "Admins can delete suggestions" on public.suggestions
+  for delete to authenticated using (public.is_admin());
+
+-- ─── Curated lists ("Best momo in Patan") ──────────────────────────────────
+create table if not exists public.lists (
+  slug       text primary key check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  title      text not null check (length(title) between 1 and 120),
+  intro      text not null default '',
+  cover      text not null default '',
+  places     text[] not null default '{}',   -- place slugs, in the order shown
+  published  boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.lists enable row level security;
+
+drop policy if exists "Anyone can read published lists" on public.lists;
+create policy "Anyone can read published lists" on public.lists
+  for select using (published or public.is_admin());
+drop policy if exists "Admins can insert lists" on public.lists;
+create policy "Admins can insert lists" on public.lists
+  for insert to authenticated with check (public.is_admin());
+drop policy if exists "Admins can update lists" on public.lists;
+create policy "Admins can update lists" on public.lists
+  for update to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "Admins can delete lists" on public.lists;
+create policy "Admins can delete lists" on public.lists
+  for delete to authenticated using (public.is_admin());
+
+-- ─── Neighbourhood guides ────────────────────────────────────────────────
+-- Every neighbourhood with a published place gets a page automatically; this
+-- table only holds the optional intro and cover photo, keyed by its slug.
+create table if not exists public.areas (
+  slug       text primary key check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  name       text not null,
+  intro      text not null default '',
+  cover      text not null default '',
+  updated_at timestamptz not null default now()
+);
+alter table public.areas enable row level security;
+
+drop policy if exists "Anyone can read areas" on public.areas;
+create policy "Anyone can read areas" on public.areas for select using (true);
+drop policy if exists "Admins can insert areas" on public.areas;
+create policy "Admins can insert areas" on public.areas
+  for insert to authenticated with check (public.is_admin());
+drop policy if exists "Admins can update areas" on public.areas;
+create policy "Admins can update areas" on public.areas
+  for update to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "Admins can delete areas" on public.areas;
+create policy "Admins can delete areas" on public.areas
   for delete to authenticated using (public.is_admin());
 
 -- ─── Photo storage ───────────────────────────────────────────────────────

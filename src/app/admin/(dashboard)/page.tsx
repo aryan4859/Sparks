@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { placeFromRow, type PlaceRow, type PostRow } from "@/lib/db";
+import { type ListRow, placeFromRow, type PlaceRow, type PostRow } from "@/lib/db";
+import { getAreas } from "@/lib/queries";
 import { dismissSuggestion, eraseSubscriber } from "@/app/admin/actions";
 import { DeleteButton } from "@/components/admin/ui";
 import { newsletterReady } from "@/lib/newsletter";
@@ -28,6 +29,8 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
   if (tab === "journal") return <JournalList />;
   if (tab === "subscribers") return <SubscriberList />;
   if (tab === "suggestions") return <SuggestionList />;
+  if (tab === "lists") return <ListsList />;
+  if (tab === "areas") return <AreasList />;
   return <PlacesList sp={sp} />;
 }
 
@@ -335,6 +338,76 @@ async function SuggestionList() {
                   pendingLabel="Dismissing…"
                 />
               </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+async function ListsList() {
+  const supabase = await sessionClient();
+  const res = await supabase.from("lists").select("*").order("updated_at", { ascending: false }).returns<ListRow[]>();
+  if (res.error) throw dbError(res.error);
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Lists</h1>
+          <p className="mt-1 text-sm text-muted">Curated lists like “Best momo in Patan”, shown at /lists and on the home page.</p>
+        </div>
+        <Link href="/admin/lists/new" className="bg-ink px-5 py-2.5 text-sm text-paper hover:opacity-85">+ New list</Link>
+      </div>
+      {res.data.length === 0 ? (
+        <p className="border border-dashed border-line p-6 text-sm text-muted">No lists yet.</p>
+      ) : (
+        <ul className="divide-y divide-line border-y border-line">
+          {res.data.map((l) => (
+            <li key={l.slug}>
+              <Link href={`/admin/lists/${l.slug}`} className="flex items-center gap-4 py-3 hover:bg-card/50">
+                <div className="relative flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden bg-card text-[10px] text-muted">
+                  {l.cover ? <Image src={l.cover} alt="" fill sizes="80px" className="object-cover" /> : "No photo"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">
+                    {l.title}
+                    {!l.published && <span className="label ml-2 text-warn">Draft</span>}
+                  </p>
+                  <p className="text-xs text-muted">{l.places.length} {l.places.length === 1 ? "place" : "places"}</p>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+async function AreasList() {
+  const areas = await getAreas();
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight">Areas</h1>
+        <p className="mt-1 text-sm text-muted">
+          Every neighbourhood with a published place has a guide page. Add an intro and cover photo to make it more than a map.
+        </p>
+      </div>
+      {areas.length === 0 ? (
+        <p className="border border-dashed border-line p-6 text-sm text-muted">Publish a place to get its neighbourhood page.</p>
+      ) : (
+        <ul className="divide-y divide-line border-y border-line">
+          {areas.map((a) => (
+            <li key={a.slug}>
+              <Link href={`/admin/areas/${a.slug}`} className="flex items-center justify-between gap-4 py-3 hover:bg-card/50">
+                <span className="font-medium">
+                  {a.name}
+                  {!a.intro && <span className="label ml-2 text-muted">No intro yet</span>}
+                </span>
+                <span className="text-xs text-muted">{a.count} {a.count === 1 ? "place" : "places"}</span>
+              </Link>
             </li>
           ))}
         </ul>

@@ -3,16 +3,19 @@ import Link from "next/link";
 import { PlaceGrid } from "@/components/PlaceCard";
 import { PostCard } from "@/components/PostCard";
 import { categories } from "@/lib/site";
-import { getFacets, getFeatured, getLatest, getPlaces, getPosts } from "@/lib/queries";
+import { ListCard } from "@/components/ListCard";
+import { getAreas, getFeatured, getLatest, getLists, getPlaces, getPlacesBySlugs, getPosts } from "@/lib/queries";
 import type { Category } from "@/lib/types";
 
 export default async function Home() {
-  const [featured, latest, posts, facets] = await Promise.all([
+  const [featured, latest, posts, areas, lists] = await Promise.all([
     getFeatured(),
     getLatest(4),
     getPosts(),
-    getFacets(),
+    getAreas(),
+    getLists(),
   ]);
+  const listCounts = await Promise.all(lists.slice(0, 3).map(async (l) => (await getPlacesBySlugs(l.places)).length));
   const [hero, ...restFeatured] = featured;
   const byCategory = await Promise.all(
     (Object.keys(categories) as Category[]).map(async (c) => ({ category: c, places: (await getPlaces({ category: c })).slice(0, 4) })),
@@ -61,15 +64,15 @@ export default async function Home() {
       <section className="mx-auto mt-20 max-w-7xl px-4 sm:px-6">
         <SectionHead title="Explore by" accent="neighbourhood" />
         <div className="mt-6 flex flex-wrap gap-2">
-          {facets.areas
-            .filter((a) => a !== "Online")
+          {areas
+            .filter((a) => a.name !== "Online")
             .map((area) => (
               <Link
-                key={area}
-                href={`/explore?area=${encodeURIComponent(area)}`}
+                key={area.slug}
+                href={`/areas/${area.slug}`}
                 className="rounded-full border border-line px-5 py-2.5 text-sm transition hover:border-ink hover:bg-ink hover:text-paper"
               >
-                {area}
+                {area.name}
               </Link>
             ))}
         </div>
@@ -102,6 +105,18 @@ export default async function Home() {
           </div>
         </section>
       ))}
+
+      {/* Lists */}
+      {lists.length > 0 && (
+        <section className="mx-auto mt-28 max-w-7xl px-4 sm:px-6">
+          <SectionHead title="Handpicked" accent="lists" href="/lists" />
+          <div className="mt-8 grid gap-x-5 gap-y-12 md:grid-cols-3">
+            {lists.slice(0, 3).map((list, i) => (
+              <ListCard key={list.slug} list={list} count={listCounts[i]} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Journal */}
       <section className="mx-auto mt-28 max-w-7xl px-4 sm:px-6">

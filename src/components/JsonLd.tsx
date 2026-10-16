@@ -1,4 +1,4 @@
-import { budgetHint, categories, site, siteUrl } from "@/lib/site";
+import { budgetHint, categories, features, isFeature, site, siteUrl } from "@/lib/site";
 import type { Place, Post } from "@/lib/types";
 
 /**
@@ -43,6 +43,15 @@ export function placeJsonLd(place: Place) {
       : {}),
     ...(place.hours && SIMPLE_HOURS.test(place.hours.trim()) ? { openingHours: place.hours.trim() } : {}),
     ...(sameAs.length ? { sameAs } : {}),
+    ...(place.features.length
+      ? {
+          amenityFeature: place.features.filter(isFeature).map((f) => ({
+            "@type": "LocationFeatureSpecification",
+            name: features[f],
+            value: true,
+          })),
+        }
+      : {}),
   };
 }
 

@@ -9,6 +9,7 @@ const nav = [
   { href: "/restaurants", label: "Restaurants" },
   { href: "/shops", label: "Shops" },
   { href: "/explore", label: "Map" },
+  { href: "/lists", label: "Lists" },
   { href: "/journal", label: "Journal" },
 ];
 

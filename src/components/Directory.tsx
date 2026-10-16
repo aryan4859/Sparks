@@ -26,7 +26,7 @@ export async function Directory({
 
   const pins: MapPin[] = results.flatMap((p) =>
     p.location
-      ? [{ slug: p.slug, name: p.name, label: `${categories[p.category].label} · ${p.type}`, ...p.location }]
+      ? [{ slug: p.slug, name: p.name, label: `${categories[p.category].label} · ${p.type}`, hours: p.hours, ...p.location }]
       : [],
   );
 

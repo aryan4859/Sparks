@@ -1,9 +1,10 @@
-import { collectFacets, placeFromRow, postFromRow, type PlaceRow, type PostRow } from "./db";
+import { collectFacets, listFromRow, placeFromRow, postFromRow, type ListRow, type PlaceRow, type PostRow } from "./db";
 import { isOpen, parseHours } from "./hours";
-import { firstParam as first } from "./site";
+import { type Feature, firstParam as first, isFeature } from "./site";
 import { publicClient } from "./supabase/clients";
 import { dbError } from "./supabase/errors";
-import type { Budget, Category, Place } from "./types";
+import type { Area, Budget, Category, Place } from "./types";
+import { slugify } from "./validate";
 
 /**
  * Public read layer. Uses a session-less Supabase client, so RLS only ever
@@ -18,6 +19,8 @@ export type PlaceFilters = {
   ambience?: string;
   veg?: boolean;
   q?: string;
+  /** Has this attribute (a key of `features`). */
+  feature?: Feature;
   /** Only places open right now (hours understood by src/lib/hours.ts). */
   open?: boolean;
   /** Sort by distance from here (the visitor's location, rounded to ~100 m). */
@@ -47,6 +50,7 @@ export function parseFilters(sp: SearchParams, category?: Category): PlaceFilter
     ambience: first(sp.ambience),
     veg: first(sp.veg) === "1",
     q: first(sp.q)?.trim(),
+    feature: isFeature(first(sp.feature)) ? (first(sp.feature) as Feature) : undefined,
     open: first(sp.open) === "1",
     near: parseNear(first(sp.near)),
   };
@@ -68,6 +72,7 @@ export async function getPlaces(f: PlaceFilters = {}) {
   if (f.budget) query = query.eq("budget", f.budget);
   if (f.ambience) query = query.contains("ambience", [f.ambience]);
   if (f.veg) query = query.not("vegetarian", "is", null);
+  if (f.feature) query = query.contains("features", [f.feature]);
   const { data, error } = await query.returns<PlaceRow[]>();
   if (error) throw dbError(error);
   let places: (Place & { km?: number })[] = data.map(placeFromRow);
@@ -115,9 +120,9 @@ export async function getLatest(limit = 4) {
 
 /** Facet values available within a category, for building filter chips. */
 export async function getFacets(category?: Category) {
-  let query = publicClient().from("places").select("type, neighborhood, ambience");
+  let query = publicClient().from("places").select("type, neighborhood, ambience, features");
   if (category) query = query.eq("category", category);
-  const { data, error } = await query.returns<Pick<PlaceRow, "type" | "neighborhood" | "ambience">[]>();
+  const { data, error } = await query.returns<Pick<PlaceRow, "type" | "neighborhood" | "ambience" | "features">[]>();
   if (error) throw dbError(error);
   return collectFacets(data);
 }
@@ -174,4 +179,64 @@ export async function getPost(slug: string) {
   const { data, error } = await publicClient().from("posts").select("*").eq("slug", slug).maybeSingle<PostRow>();
   if (error) throw dbError(error);
   return data ? postFromRow(data) : undefined;
+}
+
+// ─── Curated lists ───────────────────────────────────────────────────────
+
+export async function getLists() {
+  const { data, error } = await publicClient()
+    .from("lists")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .returns<ListRow[]>();
+  if (error) throw dbError(error);
+  return data.map(listFromRow);
+}
+
+export async function getList(slug: string) {
+  const { data, error } = await publicClient().from("lists").select("*").eq("slug", slug).maybeSingle<ListRow>();
+  if (error) throw dbError(error);
+  return data ? listFromRow(data) : undefined;
+}
+
+/** Published places for these slugs, in the given order (missing or unpublished ones are skipped). */
+export async function getPlacesBySlugs(slugs: string[]) {
+  if (!slugs.length) return [];
+  const { data, error } = await publicClient().from("places").select("*").in("slug", slugs).returns<PlaceRow[]>();
+  if (error) throw dbError(error);
+  const bySlug = new Map(data.map((r) => [r.slug, placeFromRow(r)]));
+  return slugs.flatMap((s) => bySlug.get(s) ?? []);
+}
+
+// ─── Neighbourhood guides ────────────────────────────────────────────────
+
+/** Every neighbourhood with a published place, with its optional intro/cover and place count. */
+export async function getAreas() {
+  const db = publicClient();
+  const [places, extra] = await Promise.all([
+    db.from("places").select("neighborhood").neq("neighborhood", "").returns<{ neighborhood: string }[]>(),
+    db.from("areas").select("*").returns<Area[]>(),
+  ]);
+  if (places.error) throw dbError(places.error);
+  if (extra.error) throw dbError(extra.error);
+  const info = new Map(extra.data.map((a) => [a.slug, a]));
+  const areas = new Map<string, Area & { count: number }>();
+  for (const { neighborhood } of places.data) {
+    const slug = slugify(neighborhood);
+    if (!slug) continue;
+    const a = areas.get(slug) ?? { slug, name: neighborhood, intro: "", cover: "", ...info.get(slug), count: 0 };
+    a.count++;
+    areas.set(slug, a);
+  }
+  return [...areas.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
+/** One neighbourhood page: its published places (by category) and optional intro/cover. */
+export async function getArea(slug: string) {
+  const area = (await getAreas()).find((a) => a.slug === slug);
+  if (!area) return undefined;
+  // Published places are a hand-picked set, so match exactly in code: names that
+  // slugify the same ("Patan", "patan ") belong together.
+  const places = (await getPlaces()).filter((p) => slugify(p.neighborhood) === slug);
+  return { ...area, places };
 }

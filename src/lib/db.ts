@@ -1,4 +1,4 @@
-import type { Budget, Category, MenuItem, MenuSection, Place, Post } from "./types";
+import type { Budget, Category, CuratedList, MenuItem, MenuSection, Place, Post } from "./types";
 
 /** Row shapes as stored in Supabase (see supabase/schema.sql). */
 export type PlaceRow = {
@@ -10,6 +10,7 @@ export type PlaceRow = {
   city: string;
   budget: number;
   ambience: string[];
+  features: string[];
   tagline: string;
   review: string;
   cover: string;
@@ -49,6 +50,7 @@ export function placeFromRow(r: PlaceRow): Place {
     city: r.city,
     budget: (r.budget >= 1 && r.budget <= 3 ? r.budget : 2) as Budget,
     ambience: r.ambience ?? [],
+    features: r.features ?? [],
     tagline: r.tagline,
     review: r.review,
     cover: r.cover,
@@ -78,6 +80,7 @@ export function placeToRow(p: Place): PlaceRow {
     city: p.city,
     budget: p.budget,
     ambience: p.ambience,
+    features: p.features ?? [],
     tagline: p.tagline,
     review: p.review,
     cover: p.cover,
@@ -102,6 +105,22 @@ export function postFromRow(r: PostRow): Post {
   return { ...r };
 }
 
+export type ListRow = {
+  slug: string;
+  title: string;
+  intro: string;
+  cover: string;
+  places: string[];
+  published: boolean;
+  updated_at?: string;
+};
+
+export function listFromRow(r: ListRow): CuratedList {
+  return { slug: r.slug, title: r.title, intro: r.intro, cover: r.cover, places: r.places ?? [], published: r.published, updatedAt: r.updated_at };
+}
+
+export const emptyList = (): CuratedList => ({ slug: "", title: "", intro: "", cover: "", places: [], published: false });
+
 /** Blank place and story for the admin "new" forms. */
 export const emptyPlace = (): Place => ({
   slug: "",
@@ -112,6 +131,7 @@ export const emptyPlace = (): Place => ({
   city: "Kathmandu",
   budget: 2,
   ambience: [],
+  features: [],
   tagline: "",
   review: "",
   cover: "",
@@ -134,11 +154,12 @@ export const emptyPost = (): Post => ({
 });
 
 /** Distinct, sorted filter values (types, areas, ambience) from a set of place rows. */
-export function collectFacets(rows: Pick<PlaceRow, "type" | "neighborhood" | "ambience">[]) {
+export function collectFacets(rows: (Pick<PlaceRow, "type" | "neighborhood" | "ambience"> & { features?: string[] | null })[]) {
   const uniq = (xs: string[]) => [...new Set(xs.filter(Boolean))].sort();
   return {
     types: uniq(rows.map((r) => r.type)),
     areas: uniq(rows.map((r) => r.neighborhood)),
     ambience: uniq(rows.flatMap((r) => r.ambience ?? [])),
+    features: uniq(rows.flatMap((r) => r.features ?? [])),
   };
 }
